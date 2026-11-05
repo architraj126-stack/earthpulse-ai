@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: #071426;
+  color: #FFFFFF;
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #071426;
+}
+::-webkit-scrollbar-thumb {
+  background: #1E3A56;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00D4FF;
+}
+
+/* Leaflet Container Tweaks for Dark Theme */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  border-radius: 0.75rem;
+  background-color: #0D1B2A !important;
+  z-index: 10;
+}
+
+.leaflet-tile {
+  filter: brightness(0.7) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
+}
+
+.leaflet-popup-content-wrapper {
+  background: #13263A !important;
+  color: #FFFFFF !important;
+  border: 1px solid #1E3A56 !important;
+  border-radius: 0.5rem !important;
+}
+
+.leaflet-popup-tip {
+  background: #13263A !important;
+}
+
+/* Pulse and Glow Utilities */
+@keyframes earthPulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(53, 208, 127, 0.45);
+  }
+}
+
+.earth-pulse {
+  animation: earthPulse 4s infinite ease-in-out;
+}
