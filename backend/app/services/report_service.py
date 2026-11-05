@@ -109,6 +109,31 @@ def generate_pdf_report(summary: Dict[str, Any]) -> io.BytesIO:
     elements.append(Paragraph("SCIENTIFIC ENVIRONMENTAL TREND & SIGNIFICANCE REPORT", subtitle_style))
     elements.append(HRFlowable(width="100%", thickness=1.5, color=cyan, spaceAfter=15))
 
+    is_demo = summary.get("is_demonstration", False)
+    if is_demo:
+        amber_style = ParagraphStyle(
+            "AmberWarning",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=9.5,
+            leading=12,
+            textColor=colors.HexColor("#92400E")
+        )
+        amber_box = [
+            [Paragraph("SAMPLE DATA — NOT NASA OBSERVATIONS (Demonstration Mode: NASA POWER API was unreachable)", amber_style)]
+        ]
+        amber_table = Table(amber_box, colWidths=[7.4 * inch])
+        amber_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#FEF3C7")),
+            ('BOX', (0, 0), (-1, -1), 1.5, colors.HexColor("#F59E0B")),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+        ]))
+        elements.append(amber_table)
+        elements.append(Spacer(1, 10))
+
     # Metadata Block
     loc_name = summary.get("location_name", "N/A")
     lat = summary.get("latitude", 0.0)

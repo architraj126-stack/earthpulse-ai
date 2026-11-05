@@ -44,3 +44,6 @@ The median of all pairwise slopes across a time series, providing a robust, outl
 
 ### Urban Heat Island (UHI)
 A metropolitan area that is significantly warmer than surrounding rural areas due to human activities, heat-absorbing building materials, and lack of vegetation.
+
+---
+**Source Reference:** [https://www.ipcc.ch/sr15/chapter/glossary/](https://www.ipcc.ch/sr15/chapter/glossary/)

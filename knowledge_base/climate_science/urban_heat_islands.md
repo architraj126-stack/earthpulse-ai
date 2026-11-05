@@ -11,3 +11,6 @@ An Urban Heat Island (UHI) is a microclimatic phenomenon in which urban areas ex
 
 ## Bengaluru & Rapidly Urbanizing Metropolises
 Bengaluru, Karnataka (Latitude 12.9716°N, Longitude 77.5946°E), historically known as India's "Garden City," provides a quintessential case study in rapid urbanization and microclimatic transformation. Over the last four decades (1980s–2020s), rapid expansion of IT corridors, infrastructure development, and substantial reduction in tree canopy cover and water bodies (lakes) have demonstrably intensified the urban heat island effect, detectable in multi-decadal NASA POWER and MODIS thermal time-series.
+
+---
+**Source Reference:** [https://earthobservatory.nasa.gov/features/UrbanGreen](https://earthobservatory.nasa.gov/features/UrbanGreen)

@@ -55,7 +55,7 @@ While NASA and international agencies collect vast volumes of satellite observat
 - **FR-2 (WHERE)**: Support any WGS-84 coordinate (-90° to +90° lat) with interactive OpenStreetMap canvas, click-to-pick point selection, Nominatim geocoding, and global presets.
 - **FR-3 (HOW MUCH)**: Compute both parametric (OLS slope per year/decade with 95% CI) and non-parametric (Theil-Sen median slope) rates of change.
 - **FR-4 (SIGNIFICANCE)**: Execute the Mann-Kendall test ($\alpha = 0.05$) and Seasonal Mann-Kendall ($m=12$) to confirm whether trends are statistically distinguished from random noise.
-- **FR-5 (AI ASSISTANT)**: Provide grounded RAG answering backed by 28 verified peer-reviewed articles without inventing data.
+- **FR-5 (AI ASSISTANT)**: Provide grounded RAG answering backed by 28 curated summaries of NASA, NOAA, WMO and IPCC documentation without inventing data.
 - **FR-6 (REPORTING)**: Generate downloadable publication-style PDF reports via ReportLab and raw CSV exports.
 
 ---
@@ -256,7 +256,7 @@ CREATE TABLE IF NOT EXISTS nasa_cache (
 ## 9. Unique Idea & Scientific Climate Research
 
 ### 9.1 Grounded AI RAG vs. Free LLMs
-Standard LLMs frequently hallucinate climate numbers, confuse rates of change with temperature anomalies, or state statistical significance without calculating p-values. EarthPulse AI couples non-parametric calculations directly with an indexed library of 28 peer-reviewed research files, ensuring every assertion is backed by empirical data and verified literature.
+Standard LLMs frequently hallucinate climate numbers, confuse rates of change with temperature anomalies, or state statistical significance without calculating p-values. EarthPulse AI couples non-parametric calculations directly with an indexed library of 28 curated research reference files from NASA, NOAA, WMO, and IPCC, ensuring every assertion is backed by empirical data and verified literature.
 
 ### 9.2 Separation of Detection vs. Attribution
 In accordance with IPCC Good Practice Guidance Paper on Detection and Attribution, EarthPulse AI explicitly informs users that rejecting the null hypothesis ($p < 0.05$) confirms **Detection** (a non-random trend exists), but establishing **Attribution** (attributing that trend to urban heat islands vs. anthropogenic greenhouse gases) requires coupled physical modeling.

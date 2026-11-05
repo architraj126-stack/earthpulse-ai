@@ -20,3 +20,6 @@ NASA POWER ingests MERRA-2 for all historical point meteorological parameters pr
 
 ## Citation
 Gelaro, R., et al. (2017). "The Modern-Era Retrospective Analysis for Research and Applications, Version 2 (MERRA-2)." Journal of Climate, 30(14), 5419–5454. https://doi.org/10.1175/JCLI-D-16-0758.1.
+
+---
+**Source Reference:** [https://gmao.gsfc.nasa.gov/reanalysis/MERRA-2/](https://gmao.gsfc.nasa.gov/reanalysis/MERRA-2/)

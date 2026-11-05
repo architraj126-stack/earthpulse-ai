@@ -54,3 +54,6 @@ NASA POWER provides a REST API without requiring API keys for standard queries:
 
 ## Official Citation
 NASA Langley Research Center (LaRC) POWER Project. "Prediction of Worldwide Energy Resources: Surface Meteorology and Solar Energy." Funded by the NASA Earth Science Applied Sciences Program. URL: https://power.larc.nasa.gov.
+
+---
+**Source Reference:** [https://power.larc.nasa.gov/](https://power.larc.nasa.gov/)

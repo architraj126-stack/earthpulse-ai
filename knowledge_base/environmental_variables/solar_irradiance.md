@@ -19,3 +19,6 @@
 ## Environmental Significance
 - **Solar Photovoltaic (PV) Performance**: Directly determines PV array electricity generation potential.
 - **Photosynthesis & Ecosystem Productivity**: Dictates photosynthetically active radiation (PAR, 400–700 nm) driving gross primary production.
+
+---
+**Source Reference:** [https://power.larc.nasa.gov/docs/methodology/solar/](https://power.larc.nasa.gov/docs/methodology/solar/)

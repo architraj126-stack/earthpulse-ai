@@ -111,3 +111,32 @@ def test_ai_knowledge_base_retrieval():
     res = ask_earthpulse_ai("What does the Mann-Kendall p-value mean?")
     assert "p-value" in res.answer.lower() or "hypothesis" in res.answer.lower()
     assert len(res.sources_and_citations) > 0
+    assert "What the data shows:" in res.answer
+    assert "What it means:" in res.answer
+    assert "Sources:" in res.answer
+
+def test_autocorrelation_and_pettitt():
+    from app.analysis.statistical_engine import compute_autocorrelation, compute_pettitt_test
+    # Time series with a shift at index 60
+    dates = pd.date_range("2000-01-01", periods=120, freq="MS")
+    vals = np.concatenate([np.random.normal(15.0, 0.5, 60), np.random.normal(18.0, 0.5, 60)])
+    df = pd.DataFrame({"date": dates, "value": vals})
+
+    ac = compute_autocorrelation(df)
+    assert hasattr(ac, "lag1_autocorrelation")
+    assert hasattr(ac, "is_significant")
+
+    pet = compute_pettitt_test(df)
+    assert pet is not None
+    assert pet.change_point_index is not None
+    assert pet.change_point_year is not None
+
+def test_atlas_endpoint():
+    from app.routes.api import get_atlas, get_top_atlas_cells
+    atlas = get_atlas(variable="T2M")
+    assert atlas.variable == "T2M"
+    assert len(atlas.cells) > 100
+
+    top_cells = get_top_atlas_cells(variable="T2M", n=5)
+    assert len(top_cells) <= 5
+    assert all(c.is_significant for c in top_cells)

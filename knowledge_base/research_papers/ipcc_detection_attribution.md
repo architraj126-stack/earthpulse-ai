@@ -13,3 +13,6 @@ Hegerl, G. C., et al. (2010). "Good Practice Guidance Paper on Detection and Att
 3. **Implications for EarthPulse AI Users**:
    - When EarthPulse AI detects a statistically significant trend (e.g., $p < 0.01$ warming in Bengaluru), the platform confirms **Detection**.
    - The AI assistant explicitly contextualizes **Attribution** by explaining how urban development and global greenhouse forcing both contribute, avoiding oversimplified single-cause assertions.
+
+---
+**Source Reference:** [https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-3/](https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-3/)

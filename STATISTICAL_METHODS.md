@@ -1,6 +1,6 @@
 # EarthPulse AI — Statistical Trend Analysis & Mathematical Methodology
 
-EarthPulse AI implements rigorous, peer-reviewed statistical tests compliant with World Meteorological Organization (WMO) and IPCC AR6 standards to detect, quantify, and evaluate the statistical significance of environmental trends.
+EarthPulse AI implements rigorous, verified statistical tests following guidelines from World Meteorological Organization (WMO) and IPCC AR6 standards to detect, quantify, and evaluate the statistical significance of environmental trends.
 
 ---
 

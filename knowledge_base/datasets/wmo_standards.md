@@ -22,3 +22,6 @@ The World Meteorological Organization (WMO) establishes international standards 
 ## Trend Analysis Guidelines
 - WMO Guidelines on the Calculation of Climate Extremes and Indices (WMO-No. 1100) recommend using non-parametric estimators (such as Sen's slope and Mann-Kendall test) for hydrological series because rainfall and wind distributions are strongly skewed and non-Gaussian.
 - Missing data criteria: In monthly climate series, a month is considered invalid if more than 10 daily observations are missing, or more than 5 consecutive daily values are absent.
+
+---
+**Source Reference:** [https://wmo.int/resources/publications](https://wmo.int/resources/publications)

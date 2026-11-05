@@ -13,3 +13,6 @@ Near typical surface temperatures ($15^\circ\text{C}$ to $25^\circ\text{C}$), th
 3. **Implications for Trend Detection**:
    - Time-series of precipitation rarely follow smooth linear trends; they are characterized by multi-year oscillation modes (ENSO, IOD, PDO) overlaid with heightened variability.
    - Non-parametric trend detection (Mann-Kendall test) is essential to detect monotonic shifts amidst heavy variance.
+
+---
+**Source Reference:** [https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-8/](https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-8/)

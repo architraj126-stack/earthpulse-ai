@@ -23,3 +23,6 @@ $$\text{Var}(\hat{S}) = \sum_{g=1}^m \text{Var}(S_g)$$
 An alternative complementary technique is decomposing the observed monthly series $Y_{t}$ into:
 $$Y_{t} = C_{m(t)} + A_t$$
 where $C_{m}$ is the 30-year monthly climatological mean for month $m$, and $A_t$ is the deseasoned monthly anomaly. Running linear regression or Mann-Kendall testing directly upon $A_t$ isolates long-term climate signals from the recurring seasonal cycle.
+
+---
+**Source Reference:** [https://doi.org/10.1029/WR018i001p00107](https://doi.org/10.1029/WR018i001p00107)

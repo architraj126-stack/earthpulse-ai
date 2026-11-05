@@ -11,3 +11,6 @@
 ## 3. Global Precipitation Extremes & Thermodynamic Scaling
 - **Reference**: Donat, M. G., et al. (2016). "More extreme precipitation in the world's dry and wet regions." *Nature Climate Change*, 6, 508-513.
 - **Key Finding**: Observations confirm that daily precipitation extremes have intensified globally across both wet and dry climate regimes at rates consistent with the Clausius-Clapeyron thermodynamic scaling ($\approx 6-7\% \text{ per } ^\circ\text{C}$).
+
+---
+**Source Reference:** [https://www.ipcc.ch/report/ar6/wg1/](https://www.ipcc.ch/report/ar6/wg1/)

@@ -16,3 +16,6 @@ Zhang, T., et al. (2016). "Evaluation of NASA POWER Satellite-Derived Solar Radi
 3. **Precipitation Performance**:
    - `PRECTOTCORR` successfully captures synoptic rain bands, monsoonal onset dates, and multi-week wet/dry spells.
    - Extreme localized convective thunderstorm peaks tend to be smoothed across the grid cell footprint.
+
+---
+**Source Reference:** [https://power.larc.nasa.gov/docs/validation/](https://power.larc.nasa.gov/docs/validation/)

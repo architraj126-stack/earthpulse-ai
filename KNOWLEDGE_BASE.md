@@ -1,6 +1,6 @@
 # EarthPulse AI — Scientific Knowledge Base Architecture
 
-EarthPulse AI incorporates an embedded, verified scientific knowledge base (`knowledge_base/`) containing 28 structured research articles and reference documents. This ensures the platform's AI Assistant ("Ask EarthPulse AI") grounds all explanations, answers, and interpretations in peer-reviewed science rather than hallucinating facts.
+EarthPulse AI incorporates an embedded, verified scientific knowledge base (`knowledge_base/`) containing 28 structured research articles and reference documents. This ensures the platform's AI Assistant ("Ask EarthPulse AI") grounds all explanations, answers, and interpretations in curated summaries of NASA, NOAA, WMO and IPCC documentation rather than hallucinating facts.
 
 ---
 

@@ -1,534 +1,594 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
-  BarChart2,
+  Search,
   MapPin,
   Calendar,
   Layers,
+  TrendingUp,
   Sparkles,
-  GitCompare,
-  BookOpen,
-  History,
   FileText,
   Download,
-  Play,
-  RotateCcw,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
   Loader2,
   CheckCircle2,
-  AlertCircle,
-  ExternalLink,
-  ShieldCheck,
-  Info
+  XCircle,
+  HelpCircle,
+  BarChart2,
+  Activity,
+  Thermometer,
+  CloudRain,
+  Droplets,
+  Wind,
+  Sun
 } from 'lucide-react';
 import {
   getVariables,
   analyzeTrend,
-  getAnalysisHistory,
   getPdfReportUrl,
   getCsvExportUrl
 } from '../services/api';
-import InteractiveMap from '../components/InteractiveMap';
-import VariableSelector from '../components/VariableSelector';
-import DateSelector from '../components/DateSelector';
-import MetricCard from '../components/MetricCard';
+import MapWorkspace from '../components/map/MapWorkspace';
 import TimeSeriesChart from '../components/TimeSeriesChart';
 import YearlyChart from '../components/YearlyChart';
 import SeasonalChart from '../components/SeasonalChart';
 import AskEarthPulseSection from '../components/AskEarthPulseSection';
 
-export default function DashboardPage() {
-  // Navigation & View State
-  const [activeTab, setActiveTab] = useState('overview');
+const VARIABLE_ICONS = {
+  T2M: Thermometer,
+  PRECTOTCORR: CloudRain,
+  RH2M: Droplets,
+  WS2M: Wind,
+  ALLSKY_SFC_SW_DWN: Sun
+};
 
-  // Input States (Default: Bengaluru, Karnataka)
-  const [locationName, setLocationName] = useState('Bengaluru, Karnataka');
-  const [latitude, setLatitude] = useState(12.9716);
-  const [longitude, setLongitude] = useState(77.5946);
-  const [selectedVariable, setSelectedVariable] = useState('T2M');
-  const [startDate, setStartDate] = useState('2000-01-01');
-  const [endDate, setEndDate] = useState('2023-12-31');
+export default function DashboardPage() {
+  const routerLocation = useLocation();
+
+  // Navigation / Preset routing if coming from Atlas
+  const initialVariable = routerLocation.state?.variable || 'T2M';
+  const initialLat = routerLocation.state?.latitude || 12.9716;
+  const initialLon = routerLocation.state?.longitude || 77.5946;
+  const initialLocName = routerLocation.state?.locationName || 'Bengaluru, Karnataka';
+
+  // 3-Step Flow Form State
+  const [selectedVariable, setSelectedVariable] = useState(initialVariable);
+  const [locationName, setLocationName] = useState(initialLocName);
+  const [latitude, setLatitude] = useState(initialLat);
+  const [longitude, setLongitude] = useState(initialLon);
+  const [startYear, setStartYear] = useState(1990);
+  const [endYear, setEndYear] = useState(2023);
   const [frequency, setFrequency] = useState('monthly');
 
-  // Data & Analysis State
+  // App & Data States
   const [variables, setVariables] = useState([]);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [historyRuns, setHistoryRuns] = useState([]);
+  const [showAdvancedStats, setShowAdvancedStats] = useState(false);
+  const [showExplainSection, setShowExplainSection] = useState(true);
+  const [secondaryTab, setSecondaryTab] = useState('yearly');
 
-  // Load Initial Variables & Run Default Analysis
+  // Load variables and trigger initial analysis
   useEffect(() => {
     getVariables()
-      .then(vars => {
-        setVariables(vars);
-      })
-      .catch(err => console.error("Failed to load variables:", err));
+      .then((vars) => setVariables(vars || []))
+      .catch(() => {});
 
-    // Trigger initial default analysis for Bengaluru
-    triggerAnalysis();
-    loadHistory();
+    // Initial analysis run
+    runAnalysis({
+      variable: initialVariable,
+      latitude: initialLat,
+      longitude: initialLon,
+      location_name: initialLocName,
+      start_date: `${startYear}-01-01`,
+      end_date: `${endYear}-12-31`,
+      frequency: 'monthly'
+    });
   }, []);
 
-  const loadHistory = () => {
-    getAnalysisHistory(10)
-      .then(data => setHistoryRuns(data || []))
-      .catch(() => {});
-  };
-
-  const triggerAnalysis = async (customParams = null) => {
+  const runAnalysis = async (customPayload = null) => {
     setLoading(true);
     setError(null);
 
-    const payload = customParams || {
+    const payload = customPayload || {
       latitude: parseFloat(latitude),
       longitude: parseFloat(longitude),
       location_name: locationName,
       variable: selectedVariable,
-      start_date: startDate,
-      end_date: endDate,
+      start_date: `${startYear}-01-01`,
+      end_date: `${endYear}-12-31`,
       frequency: frequency
     };
 
     try {
       const data = await analyzeTrend(payload);
       setAnalysisResult(data);
-      loadHistory();
     } catch (err) {
-      setError(err.response?.data?.detail || err.message || 'Failed to analyze trend.');
+      setError(err.response?.data?.detail || err.message || 'Analysis pipeline execution failed.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLocationChange = (name, lat, lon) => {
+  // Map coordinate callback (updates state WITHOUT triggering analysis)
+  const handleMapLocationChange = useCallback((name, lat, lon) => {
     setLocationName(name);
     setLatitude(lat);
     setLongitude(lon);
-  };
+  }, []);
 
-  const currentVarInfo = variables.find(v => v.parameter === selectedVariable) || {
-    name: selectedVariable,
+  const summary = analysisResult?.summary;
+  const timeSeriesData = analysisResult?.data?.time_series || [];
+  const yearlyData = analysisResult?.data?.yearly_averages || [];
+  const monthlyData = analysisResult?.data?.monthly_variation || [];
+
+  const activeVarMeta = variables.find((v) => v.parameter === selectedVariable) || {
+    name: '2-Meter Air Temperature',
     unit: '°C',
-    source: 'NASA POWER'
-  };
-
-  const reportQueryParams = {
-    latitude,
-    longitude,
-    location_name: locationName,
-    variable: selectedVariable,
-    start_date: startDate,
-    end_date: endDate,
-    frequency
+    definition: 'Surface atmospheric air temperature at 2 meters above ground.'
   };
 
   return (
-    <div className="min-h-screen bg-[#071426] text-white flex flex-col md:flex-row">
-      
-      {/* SIDEBAR NAVIGATION */}
-      <aside className="w-full md:w-64 bg-[#0D1B2A] border-r border-[#1E3A56] p-4 flex flex-col justify-between shrink-0">
-        <div className="space-y-6">
-          
-          {/* Sidebar Section Title */}
-          <div className="px-2">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-[#00D4FF] block">
-              Environmental Workspace
-            </span>
-            <h2 className="text-sm font-bold text-white">Analytics Navigator</h2>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+      {/* Page Title */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-heading tracking-tight">
+            Environmental Trend Investigation
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-400">
+            A 3-step scientific journey: choose your variable, select any location, set your time horizon, and analyze.
+          </p>
+        </div>
+
+        {summary && (
+          <div className="flex items-center space-x-2">
+            <a
+              href={getPdfReportUrl({
+                latitude,
+                longitude,
+                location_name: locationName,
+                variable: selectedVariable,
+                start_date: `${startYear}-01-01`,
+                end_date: `${endYear}-12-31`,
+                frequency
+              })}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-[#0D1B2A] hover:bg-[#13263A] text-[#00D4FF] border border-[#1E3A56] text-xs font-semibold transition"
+            >
+              <FileText className="w-4 h-4" />
+              <span>Download PDF</span>
+            </a>
+
+            <a
+              href={getCsvExportUrl({
+                latitude,
+                longitude,
+                location_name: locationName,
+                variable: selectedVariable,
+                start_date: `${startYear}-01-01`,
+                end_date: `${endYear}-12-31`,
+                frequency
+              })}
+              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-[#0D1B2A] hover:bg-[#13263A] text-slate-300 border border-[#1E3A56] text-xs font-semibold transition"
+            >
+              <Download className="w-4 h-4" />
+              <span>CSV Data</span>
+            </a>
+          </div>
+        )}
+      </div>
+
+      {/* GUIDED 3-STEP FLOW WORKBENCH */}
+      <div className="bg-[#0D1B2A] border border-[#1E3A56] rounded-3xl p-5 sm:p-6 shadow-2xl space-y-6">
+        
+        {/* STEP 1: What are you curious about? */}
+        <div className="space-y-3">
+          <div className="flex items-center space-x-2">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#00D4FF] text-[#071426] text-xs font-bold font-mono">1</span>
+            <h2 className="text-sm sm:text-base font-bold text-white font-heading">
+              What environmental variable are you curious about?
+            </h2>
           </div>
 
-          {/* Navigation Links */}
-          <nav className="space-y-1 text-xs">
-            {[
-              { id: 'overview', label: 'Overview & Trends', icon: BarChart2 },
-              { id: 'location', label: 'Location Explorer', icon: MapPin },
-              { id: 'variables', label: 'Explore Variables', icon: Layers },
-              { id: 'ai', label: 'Ask EarthPulse AI', icon: Sparkles },
-              { id: 'history', label: 'Analysis History', icon: History },
-            ].map(tab => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
+          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {variables.map((v) => {
+              const Icon = VARIABLE_ICONS[v.parameter] || Thermometer;
+              const isSelected = selectedVariable === v.parameter;
               return (
                 <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg font-medium transition text-left ${
-                    isActive
-                      ? 'bg-[#13263A] text-[#00D4FF] border border-[#00D4FF]/30 font-semibold shadow-sm'
-                      : 'text-[#9BAEC2] hover:text-white hover:bg-[#13263A]/50'
+                  key={v.parameter}
+                  type="button"
+                  onClick={() => setSelectedVariable(v.parameter)}
+                  className={`p-3.5 rounded-2xl border text-left transition flex flex-col justify-between space-y-2 relative ${
+                    isSelected
+                      ? 'bg-[#13263A] border-[#00D4FF] shadow-lg shadow-[#00D4FF]/20 ring-1 ring-[#00D4FF]'
+                      : 'bg-[#13263A]/60 border-[#1E3A56] hover:border-slate-500 hover:bg-[#13263A]'
                   }`}
                 >
-                  <Icon className="w-4 h-4 opacity-80" />
-                  <span>{tab.label}</span>
+                  <div className="flex items-center justify-between">
+                    <div className={`p-2 rounded-xl ${isSelected ? 'bg-[#00D4FF] text-[#071426]' : 'bg-[#0D1B2A] text-[#00D4FF]'}`}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <span className="text-[10px] font-mono text-slate-400 font-semibold px-2 py-0.5 rounded bg-[#0D1B2A] border border-[#1E3A56]">
+                      {v.unit}
+                    </span>
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-white font-heading leading-tight">{v.name}</h3>
+                    <p className="text-[11px] text-slate-400 line-clamp-2 mt-1 leading-snug">
+                      {v.definition}
+                    </p>
+                  </div>
                 </button>
               );
             })}
-          </nav>
-
-          {/* Current Query Quick Summary Box */}
-          <div className="bg-[#13263A] border border-[#1E3A56] rounded-xl p-3 text-[11px] space-y-2">
-            <div className="text-[#00D4FF] font-semibold flex items-center justify-between">
-              <span>Active Target</span>
-              <span className="w-2 h-2 rounded-full bg-[#35D07F]"></span>
-            </div>
-            <div>
-              <div className="text-white font-bold truncate">{locationName}</div>
-              <div className="text-[#9BAEC2] font-mono text-[10px]">
-                {latitude.toFixed(2)}°N, {longitude.toFixed(2)}°E
-              </div>
-            </div>
-            <div className="pt-1 border-t border-[#1E3A56] flex items-center justify-between text-[#9BAEC2]">
-              <span>Variable:</span>
-              <span className="text-white font-mono font-bold">{selectedVariable}</span>
-            </div>
-            <div className="flex items-center justify-between text-[#9BAEC2]">
-              <span>Window:</span>
-              <span className="text-white">{startDate.slice(0, 4)}–{endDate.slice(0, 4)}</span>
-            </div>
-          </div>
-
-        </div>
-
-        {/* Sidebar Footer */}
-        <div className="pt-4 border-t border-[#1E3A56] text-[10px] text-[#9BAEC2] space-y-1">
-          <div className="flex items-center gap-1 text-[#35D07F]">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>NASA POWER Verified</span>
-          </div>
-          <p>© 2026 EarthPulse AI Engine</p>
-        </div>
-      </aside>
-
-      {/* MAIN DASHBOARD CONTENT AREA */}
-      <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 overflow-y-auto max-w-7xl mx-auto w-full">
-        
-        {/* STICKY TOP CONTROL STRIP */}
-        <div className="bg-[#13263A] border border-[#1E3A56] rounded-2xl p-4 shadow-xl space-y-4">
-          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-            
-            {/* Quick Variable Dropdown */}
-            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-              <div>
-                <label className="block text-[10px] text-[#9BAEC2] uppercase font-semibold mb-1">
-                  Environmental Variable
-                </label>
-                <select
-                  value={selectedVariable}
-                  onChange={(e) => setSelectedVariable(e.target.value)}
-                  className="bg-[#0D1B2A] border border-[#1E3A56] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#00D4FF] font-medium"
-                >
-                  {variables.map(v => (
-                    <option key={v.parameter} value={v.parameter}>
-                      {v.parameter} — {v.name} ({v.unit})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Quick Location Badge */}
-              <div>
-                <label className="block text-[10px] text-[#9BAEC2] uppercase font-semibold mb-1">
-                  Target Location
-                </label>
-                <button
-                  onClick={() => setActiveTab('location')}
-                  className="bg-[#0D1B2A] border border-[#1E3A56] hover:border-[#00D4FF] rounded-lg px-3 py-1.5 text-xs text-white flex items-center gap-1.5 transition"
-                >
-                  <MapPin className="w-3.5 h-3.5 text-[#00D4FF]" />
-                  <span className="font-semibold truncate max-w-[160px] sm:max-w-[220px]">{locationName}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Run Analysis & Quick Actions */}
-            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
-              
-              <button
-                onClick={() => triggerAnalysis()}
-                disabled={loading}
-                className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#00D4FF] to-[#35D07F] text-[#071426] font-bold text-xs flex items-center gap-1.5 hover:brightness-110 transition shadow-[0_0_15px_rgba(0,212,255,0.3)] active:scale-95 disabled:opacity-50"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Processing Data...</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-3.5 h-3.5 fill-current" />
-                    <span>Run Statistical Analysis</span>
-                  </>
-                )}
-              </button>
-
-              <a
-                href={getPdfReportUrl(reportQueryParams)}
-                target="_blank"
-                rel="noreferrer"
-                className="px-3.5 py-2 rounded-xl bg-[#0D1B2A] hover:bg-[#1E3A56] border border-[#1E3A56] text-xs text-white font-medium flex items-center gap-1.5 transition active:scale-95"
-              >
-                <FileText className="w-3.5 h-3.5 text-[#00D4FF]" />
-                <span className="hidden sm:inline">Download</span> PDF
-              </a>
-
-              <a
-                href={getCsvExportUrl(reportQueryParams)}
-                target="_blank"
-                rel="noreferrer"
-                className="px-3.5 py-2 rounded-xl bg-[#0D1B2A] hover:bg-[#1E3A56] border border-[#1E3A56] text-xs text-white font-medium flex items-center gap-1.5 transition active:scale-95"
-              >
-                <Download className="w-3.5 h-3.5 text-[#35D07F]" />
-                <span className="hidden sm:inline">Export</span> CSV
-              </a>
-
-            </div>
-
           </div>
         </div>
 
-        {/* ERROR NOTICE BANNER */}
-        {error && (
-          <div className="bg-[#FF4D4D]/10 border border-[#FF4D4D]/30 p-4 rounded-xl flex items-center gap-3 text-xs text-[#FF4D4D]">
-            <AlertCircle className="w-5 h-5 shrink-0" />
-            <div className="space-y-1">
-              <span className="font-bold">Analysis Execution Notice:</span>
-              <p>{error}</p>
+        {/* STEP 2: Where? (Map Workspace) */}
+        <div className="space-y-3 pt-4 border-t border-[#1E3A56]/60">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#00D4FF] text-[#071426] text-xs font-bold font-mono">2</span>
+              <h2 className="text-sm sm:text-base font-bold text-white font-heading">
+                Where? (Drop a pin, explore NASA Satellite, or view Global Atlas)
+              </h2>
+            </div>
+            <div className="text-xs font-mono text-[#00D4FF] hidden sm:block">
+              Coordinates: {latitude.toFixed(2)}°, {longitude.toFixed(2)}°
             </div>
           </div>
-        )}
 
-        {/* TAB 1: OVERVIEW & TREND ANALYSIS */}
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
-            
-            {/* Primary Statistical Cards */}
-            {analysisResult && (
-              <MetricCard summary={analysisResult.summary} />
-            )}
-
-            {/* Historical Recharts Visualizations */}
-            {analysisResult && (
-              <TimeSeriesChart
-                data={analysisResult.data.time_series}
-                variableName={analysisResult.summary.variable_name}
-                unit={analysisResult.summary.unit}
-                onDownloadCsv={() => window.open(getCsvExportUrl(reportQueryParams), '_blank')}
-              />
-            )}
-
-            {/* Annual Aggregates & Seasonal Climatology */}
-            {analysisResult && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <YearlyChart
-                  data={analysisResult.data.yearly_averages}
-                  unit={analysisResult.summary.unit}
-                />
-                <SeasonalChart
-                  data={analysisResult.data.monthly_variation}
-                  unit={analysisResult.summary.unit}
-                />
-              </div>
-            )}
-
-            {/* Scientific Explanation & Earth Systems Context */}
-            {analysisResult && (
-              <div className="bg-[#13263A] rounded-xl border border-[#1E3A56] p-5 shadow-lg space-y-3">
-                <div className="flex items-center gap-2 text-white font-bold text-sm sm:text-base border-b border-[#1E3A56] pb-2">
-                  <BookOpen className="w-4 h-4 text-[#00D4FF]" />
-                  <span>Earth Science Interpretation & Evidence</span>
-                </div>
-                <div className="text-xs text-[#9BAEC2] leading-relaxed whitespace-pre-line space-y-2">
-                  {analysisResult.summary.scientific_explanation}
-                </div>
-                <div className="pt-2 border-t border-[#1E3A56] text-[11px] text-[#9BAEC2] italic">
-                  {analysisResult.summary.methodology_limitations}
-                </div>
-              </div>
-            )}
-
-            {/* Grounded AI Data Detective Section */}
-            <AskEarthPulseSection currentAnalysis={analysisResult?.summary} />
-
-          </div>
-        )}
-
-        {/* TAB 2: LOCATION EXPLORER */}
-        {activeTab === 'location' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-[#00D4FF]" />
-                  <span>Interactive Global Location Explorer</span>
-                </h3>
-                <p className="text-xs text-[#9BAEC2]">
-                  Search for cities, click anywhere on the planet to set target coordinates, or enter latitude and longitude manually.
-                </p>
-              </div>
-            </div>
-
-            <InteractiveMap
+          <div className="h-[460px]">
+            <MapWorkspace
               locationName={locationName}
               latitude={latitude}
               longitude={longitude}
-              onLocationChange={handleLocationChange}
+              onLocationChange={handleMapLocationChange}
+              activeVariable={selectedVariable}
             />
+          </div>
+        </div>
 
-            <DateSelector
-              startDate={startDate}
-              endDate={endDate}
-              frequency={frequency}
-              onStartDateChange={setStartDate}
-              onEndDateChange={setEndDate}
-              onFrequencyChange={setFrequency}
-            />
+        {/* STEP 3: When? (Period & Resolution) + Sticky Analyze Button */}
+        <div className="space-y-4 pt-4 border-t border-[#1E3A56]/60">
+          <div className="flex items-center space-x-2">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#00D4FF] text-[#071426] text-xs font-bold font-mono">3</span>
+            <h2 className="text-sm sm:text-base font-bold text-white font-heading">
+              When? (Multi-decadal period: 1990 to {endYear})
+            </h2>
+          </div>
 
-            <div className="flex justify-end">
-              <button
-                onClick={() => {
-                  setActiveTab('overview');
-                  triggerAnalysis();
-                }}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#00D4FF] to-[#35D07F] text-[#071426] font-bold text-xs flex items-center gap-2 hover:brightness-110 transition shadow-lg"
-              >
-                <Play className="w-4 h-4 fill-current" />
-                <span>Apply Location & Run Analysis</span>
-              </button>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center bg-[#13263A] p-4 rounded-2xl border border-[#1E3A56]">
+            {/* Start Year Slider */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs text-slate-300 font-medium">
+                <span>Start Year: <b className="text-white font-mono">{startYear}</b></span>
+                <span className="text-slate-400 font-mono">1981–2015</span>
+              </div>
+              <input
+                type="range"
+                min={1981}
+                max={2015}
+                value={startYear}
+                onChange={(e) => setStartYear(parseInt(e.target.value, 10))}
+                className="w-full accent-[#00D4FF] h-2 bg-[#0D1B2A] rounded-lg cursor-pointer"
+              />
+            </div>
+
+            {/* End Year Slider */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs text-slate-300 font-medium">
+                <span>End Year: <b className="text-white font-mono">{endYear}</b></span>
+                <span className="text-slate-400 font-mono">2000–2023</span>
+              </div>
+              <input
+                type="range"
+                min={2000}
+                max={2023}
+                value={endYear}
+                onChange={(e) => setEndYear(parseInt(e.target.value, 10))}
+                className="w-full accent-[#00D4FF] h-2 bg-[#0D1B2A] rounded-lg cursor-pointer"
+              />
+            </div>
+
+            {/* Resolution Buttons */}
+            <div className="space-y-1">
+              <span className="text-xs text-slate-300 font-medium block">Resolution:</span>
+              <div className="flex bg-[#0D1B2A] p-1 rounded-xl border border-[#1E3A56]">
+                <button
+                  type="button"
+                  onClick={() => setFrequency('monthly')}
+                  className={`flex-1 py-1.5 text-xs rounded-lg font-semibold transition ${
+                    frequency === 'monthly'
+                      ? 'bg-[#00D4FF] text-[#071426] font-bold shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Monthly (Standard)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFrequency('daily')}
+                  className={`flex-1 py-1.5 text-xs rounded-lg font-semibold transition ${
+                    frequency === 'daily'
+                      ? 'bg-[#00D4FF] text-[#071426] font-bold shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Daily
+                </button>
+              </div>
             </div>
           </div>
-        )}
 
-        {/* TAB 3: EXPLORE VARIABLES */}
-        {activeTab === 'variables' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
+          {/* Sticky Action Button */}
+          <div className="pt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={() => runAnalysis()}
+              disabled={loading}
+              className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-[#00D4FF] to-[#0099FF] text-[#071426] font-extrabold text-sm sm:text-base hover:brightness-110 transition shadow-xl shadow-[#00D4FF]/25 flex items-center justify-center space-x-2 active:scale-95 disabled:opacity-50"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Computing Non-Parametric Statistics...</span>
+                </>
+              ) : (
+                <>
+                  <TrendingUp className="w-5 h-5" />
+                  <span>Analyze Environmental Trends</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Error Callout */}
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/40 text-red-200 p-4 rounded-2xl flex items-center space-x-3 text-sm">
+          <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* RESULTS PRESENTATION ORDER */}
+      {summary && (
+        <div className="space-y-6 animate-fade-in">
+
+          {/* 1. Persistent AMBER Banner if Demonstration Data */}
+          {summary.is_demonstration && (
+            <div className="bg-amber-500/15 border border-amber-500/50 p-3.5 rounded-2xl flex items-center space-x-3 text-amber-300 text-xs sm:text-sm">
+              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
               <div>
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Layers className="w-5 h-5 text-[#00D4FF]" />
-                  <span>NASA Earth Science Variable Library</span>
-                </h3>
-                <p className="text-xs text-[#9BAEC2]">
-                  Select environmental variables to explore physical definitions, measurement units, and scientific context.
-                </p>
+                <b className="font-bold">SAMPLE DATA — NOT NASA OBSERVATIONS:</b>
+                <span className="ml-1">
+                  The live NASA POWER gateway was temporarily unreachable. Displaying calibrated demonstration values.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* 2. One-Sentence Plain English HEADLINE */}
+          <div className="bg-gradient-to-r from-[#0D1B2A] via-[#13263A] to-[#0D1B2A] border border-[#1E3A56] p-5 rounded-2xl shadow-xl flex items-center space-x-3">
+            <div className={`p-2.5 rounded-xl shrink-0 ${
+              summary.is_significant && summary.sens_slope_per_year > 0
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                : summary.is_significant && summary.sens_slope_per_year < 0
+                ? 'bg-red-500/20 text-red-400 border border-red-500/40'
+                : 'bg-slate-500/20 text-slate-300 border border-slate-500/40'
+            }`}>
+              <Activity className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Scientific Assessment Headline</div>
+              <h2 className="text-base sm:text-lg font-bold text-white font-heading leading-snug">
+                {summary.headline || `${activeVarMeta.name} exhibits ${summary.trend_direction} trend in ${locationName}.`}
+              </h2>
+            </div>
+          </div>
+
+          {/* 3. Hero Chart: Observations + Trend Line + 95% CI Band */}
+          <TimeSeriesChart
+            data={timeSeriesData}
+            variableName={summary.variable_name}
+            unit={summary.unit}
+            pettitt={summary.pettitt}
+            onDownloadCsv={() => {
+              window.location.href = getCsvExportUrl({
+                latitude,
+                longitude,
+                location_name: locationName,
+                variable: selectedVariable,
+                start_date: `${startYear}-01-01`,
+                end_date: `${endYear}-12-31`,
+                frequency
+              });
+            }}
+          />
+
+          {/* 4. Four Core Stat Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Card 1: Rate Per Decade */}
+            <div className="bg-[#13263A] border border-[#1E3A56] p-4 rounded-2xl shadow-lg space-y-1">
+              <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Sen's Rate of Change</div>
+              <div className="text-2xl font-extrabold text-[#00D4FF] font-mono">
+                {summary.rate_per_decade > 0 ? '+' : ''}{summary.rate_per_decade}
+                <span className="text-xs text-slate-400 font-normal ml-1">{summary.unit}/dec</span>
+              </div>
+              <div className="text-[11px] text-slate-400 font-mono">
+                ({summary.sens_slope_per_year > 0 ? '+' : ''}{summary.sens_slope_per_year.toFixed(4)} {summary.unit}/yr)
               </div>
             </div>
 
-            <VariableSelector
-              variables={variables}
-              selectedVariable={selectedVariable}
-              onSelectVariable={(p) => {
-                setSelectedVariable(p);
-                setActiveTab('overview');
-                triggerAnalysis({
-                  latitude: parseFloat(latitude),
-                  longitude: parseFloat(longitude),
-                  location_name: locationName,
-                  variable: p,
-                  start_date: startDate,
-                  end_date: endDate,
-                  frequency: frequency
-                });
-              }}
-            />
-          </div>
-        )}
-
-        {/* TAB 4: ASK EARTHPULSE AI */}
-        {activeTab === 'ai' && (
-          <div className="space-y-6">
-            <AskEarthPulseSection currentAnalysis={analysisResult?.summary} />
-          </div>
-        )}
-
-        {/* TAB 5: ANALYSIS HISTORY */}
-        {activeTab === 'history' && (
-          <div className="bg-[#13263A] rounded-xl border border-[#1E3A56] p-5 shadow-lg space-y-4">
-            <div className="flex items-center justify-between border-b border-[#1E3A56] pb-3">
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <History className="w-4 h-4 text-[#00D4FF]" />
-                  <span>SQLite Analysis Run Archive</span>
-                </h3>
-                <p className="text-xs text-[#9BAEC2]">
-                  Previous trend assessments stored in local SQLite database.
-                </p>
+            {/* Card 2: P-Value & Significance (Color-blind safe) */}
+            <div className="bg-[#13263A] border border-[#1E3A56] p-4 rounded-2xl shadow-lg space-y-1">
+              <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Statistical Significance</div>
+              <div className="flex items-center space-x-2">
+                <span
+                  className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                    summary.is_significant && summary.sens_slope_per_year > 0
+                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40'
+                      : summary.is_significant && summary.sens_slope_per_year < 0
+                      ? 'bg-red-500/15 text-red-400 border-red-500/40'
+                      : 'bg-slate-500/15 text-slate-400 border-slate-500/40'
+                  }`}
+                >
+                  {summary.is_significant ? <CheckCircle2 className="w-3.5 h-3.5" /> : <HelpCircle className="w-3.5 h-3.5" />}
+                  <span>{summary.is_significant ? (summary.sens_slope_per_year > 0 ? 'Sig. Increase' : 'Sig. Decrease') : 'No Significant Trend'}</span>
+                </span>
               </div>
-              <button
-                onClick={loadHistory}
-                className="px-3 py-1 rounded-lg bg-[#0D1B2A] border border-[#1E3A56] text-xs text-[#00D4FF] hover:bg-[#1E3A56] transition"
-              >
-                Refresh Archive
-              </button>
+              <div className="text-[11px] text-slate-400 font-mono pt-0.5">
+                p-value: <b className="text-white font-mono">{summary.mann_kendall?.p_value?.toFixed(5) || 'N/A'}</b> (α = 0.05)
+              </div>
             </div>
 
-            {historyRuns.length === 0 ? (
-              <p className="text-xs text-[#9BAEC2] py-8 text-center">No previous runs recorded yet.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-[#0D1B2A] text-[#9BAEC2] uppercase font-mono text-[10px]">
-                    <tr>
-                      <th className="p-2.5">Date & Time</th>
-                      <th className="p-2.5">Region</th>
-                      <th className="p-2.5">Variable</th>
-                      <th className="p-2.5">Window</th>
-                      <th className="p-2.5">Sen's Slope</th>
-                      <th className="p-2.5">MK P-Value</th>
-                      <th className="p-2.5">Significance</th>
-                      <th className="p-2.5 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#1E3A56] text-white">
-                    {historyRuns.map(run => (
-                      <tr key={run.id} className="hover:bg-[#0D1B2A]/50 transition">
-                        <td className="p-2.5 font-mono text-[#9BAEC2]">{run.created_at?.slice(0, 16).replace('T', ' ')}</td>
-                        <td className="p-2.5 font-semibold">{run.location_name}</td>
-                        <td className="p-2.5 font-mono text-[#00D4FF]">{run.variable}</td>
-                        <td className="p-2.5 text-[#9BAEC2]">{run.start_date?.slice(0, 4)}–{run.end_date?.slice(0, 4)}</td>
-                        <td className="p-2.5 font-mono font-bold">{run.sen_slope > 0 ? `+${run.sen_slope}` : run.sen_slope}</td>
-                        <td className="p-2.5 font-mono">{run.p_value}</td>
-                        <td className="p-2.5">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                            run.is_significant ? 'bg-[#35D07F]/20 text-[#35D07F]' : 'bg-[#9BAEC2]/20 text-[#9BAEC2]'
-                          }`}>
-                            {run.is_significant ? 'Significant' : 'No Trend'}
+            {/* Card 3: Total Estimated Change */}
+            <div className="bg-[#13263A] border border-[#1E3A56] p-4 rounded-2xl shadow-lg space-y-1">
+              <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Estimated Total Shift</div>
+              <div className="text-2xl font-extrabold text-white font-mono">
+                {summary.total_change > 0 ? '+' : ''}{summary.total_change}
+                <span className="text-xs text-slate-400 font-normal ml-1">{summary.unit}</span>
+              </div>
+              <div className="text-[11px] text-slate-400 font-mono">
+                Across {endYear - startYear + 1} years ({startYear}–{endYear})
+              </div>
+            </div>
+
+            {/* Card 4: Data Quality & Grid */}
+            <div className="bg-[#13263A] border border-[#1E3A56] p-4 rounded-2xl shadow-lg space-y-1">
+              <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Data Quality & Sensor Grid</div>
+              <div className="text-2xl font-extrabold text-[#35D07F] font-mono">
+                {summary.observation_count}
+                <span className="text-xs text-slate-400 font-normal ml-1">obs ({100 - summary.missing_percentage}%)</span>
+              </div>
+              <div className="text-[11px] text-slate-400 font-mono">
+                ~50 km cell &bull; {summary.source}
+              </div>
+            </div>
+          </div>
+
+          {/* 5. Collapsed Advanced Statistics Accordion */}
+          <div className="bg-[#13263A] border border-[#1E3A56] rounded-2xl overflow-hidden shadow-xl">
+            <button
+              type="button"
+              onClick={() => setShowAdvancedStats(!showAdvancedStats)}
+              className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-[#1E3A56]/30 transition"
+            >
+              <div className="flex items-center space-x-2">
+                <BarChart2 className="w-4 h-4 text-[#00D4FF]" />
+                <span className="text-sm font-bold text-white font-heading">Advanced Statistical Indicators</span>
+                <span className="text-xs text-slate-400 font-mono">(Autocorrelation, Pettitt Test, Seasonal MK)</span>
+              </div>
+              {showAdvancedStats ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+            </button>
+
+            {showAdvancedStats && (
+              <div className="p-5 border-t border-[#1E3A56] space-y-4 text-xs">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  
+                  {/* OLS Linear Regression */}
+                  <div className="bg-[#0D1B2A] p-3.5 rounded-xl border border-[#1E3A56] space-y-1 font-mono">
+                    <div className="text-slate-400 font-sans font-bold">OLS Regression Parameters</div>
+                    <div>Slope: <b className="text-white">{summary.linear_regression?.slope_per_year?.toFixed(4)} {summary.unit}/yr</b></div>
+                    <div>Intercept: <b className="text-white">{summary.linear_regression?.intercept?.toFixed(2)}</b></div>
+                    <div>R² Score: <b className="text-[#00D4FF]">{summary.linear_regression?.r_squared?.toFixed(4)}</b></div>
+                    <div>p-value: <b className="text-white">{summary.linear_regression?.p_value?.toFixed(5)}</b></div>
+                  </div>
+
+                  {/* Mann-Kendall Test Statistics */}
+                  <div className="bg-[#0D1B2A] p-3.5 rounded-xl border border-[#1E3A56] space-y-1 font-mono">
+                    <div className="text-slate-400 font-sans font-bold">Mann-Kendall Details</div>
+                    <div>Tau (τ): <b className="text-white">{summary.mann_kendall?.tau?.toFixed(4)}</b></div>
+                    <div>S-Statistic: <b className="text-white">{summary.mann_kendall?.s}</b></div>
+                    <div>Variance Var(S): <b className="text-white">{summary.mann_kendall?.var_s}</b></div>
+                    <div>Z-Score: <b className="text-[#00D4FF]">{summary.mann_kendall?.z?.toFixed(3)}</b></div>
+                  </div>
+
+                  {/* Serial Autocorrelation Check */}
+                  <div className="bg-[#0D1B2A] p-3.5 rounded-xl border border-[#1E3A56] space-y-1 font-mono">
+                    <div className="text-slate-400 font-sans font-bold">Lag-1 Serial Correlation</div>
+                    <div>r₁ value: <b className={summary.autocorrelation?.is_significant ? 'text-amber-400' : 'text-white'}>
+                      {summary.autocorrelation?.lag1?.toFixed(4)}
+                    </b></div>
+                    <div>Critical threshold: <b className="text-slate-400">±{summary.autocorrelation?.critical_value?.toFixed(3)}</b></div>
+                    <div>Adjusted p-value: <b className="text-[#00D4FF]">{summary.autocorrelation?.adjusted_mk_p_value?.toFixed(5)}</b></div>
+                    <div className="text-[10px] text-slate-400 font-sans pt-1">
+                      {summary.autocorrelation?.explanation}
+                    </div>
+                  </div>
+
+                  {/* Pettitt Change-Point Test */}
+                  {summary.pettitt && (
+                    <div className="bg-[#0D1B2A] p-3.5 rounded-xl border border-[#1E3A56] space-y-1 font-mono col-span-1 md:col-span-2 lg:col-span-3">
+                      <div className="text-slate-400 font-sans font-bold flex items-center space-x-1.5">
+                        <span>Pettitt Change-Point Detection (Pettitt, 1979)</span>
+                        {summary.pettitt.is_significant && (
+                          <span className="px-2 py-0.2 rounded-full bg-amber-500/15 text-amber-400 text-[10px] border border-amber-500/30">
+                            Statistically Significant
                           </span>
-                        </td>
-                        <td className="p-2.5 text-right">
-                          <button
-                            onClick={() => {
-                              setLocationName(run.location_name);
-                              setLatitude(run.latitude);
-                              setLongitude(run.longitude);
-                              setSelectedVariable(run.variable);
-                              setStartDate(run.start_date);
-                              setEndDate(run.end_date);
-                              setFrequency(run.temporal_resolution);
-                              setActiveTab('overview');
-                              triggerAnalysis({
-                                latitude: run.latitude,
-                                longitude: run.longitude,
-                                location_name: run.location_name,
-                                variable: run.variable,
-                                start_date: run.start_date,
-                                end_date: run.end_date,
-                                frequency: run.temporal_resolution
-                              });
-                            }}
-                            className="px-2.5 py-1 bg-[#00D4FF]/10 text-[#00D4FF] hover:bg-[#00D4FF] hover:text-[#071426] rounded transition font-semibold"
-                          >
-                            Re-Run
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                        <div>Change-Point Date: <b className="text-[#00D4FF]">{summary.pettitt.change_point_date || 'None'}</b></div>
+                        <div>K-Statistic: <b className="text-white">{summary.pettitt.k_statistic}</b></div>
+                        <div>Change-Point p-value: <b className="text-white">{summary.pettitt.p_value}</b></div>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
               </div>
             )}
           </div>
-        )}
 
-      </main>
+          {/* Secondary Charts: Annual Mean vs Seasonal Profile */}
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={() => setSecondaryTab('yearly')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                  secondaryTab === 'yearly'
+                    ? 'bg-[#00D4FF] text-[#071426] border-[#00D4FF] font-bold'
+                    : 'bg-[#0D1B2A] text-slate-300 border-[#1E3A56] hover:text-white'
+                }`}
+              >
+                Annual Aggregates
+              </button>
+              <button
+                type="button"
+                onClick={() => setSecondaryTab('seasonal')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                  secondaryTab === 'seasonal'
+                    ? 'bg-[#00D4FF] text-[#071426] border-[#00D4FF] font-bold'
+                    : 'bg-[#0D1B2A] text-slate-300 border-[#1E3A56] hover:text-white'
+                }`}
+              >
+                Monthly Seasonal Profile
+              </button>
+            </div>
+
+            {secondaryTab === 'yearly' ? (
+              <YearlyChart data={yearlyData} unit={summary.unit} />
+            ) : (
+              <SeasonalChart data={monthlyData} unit={summary.unit} />
+            )}
+          </div>
+
+          {/* 6. "Explain This" AI Assistant Section */}
+          <AskEarthPulseSection currentAnalysis={summary} />
+
+        </div>
+      )}
 
     </div>
   );

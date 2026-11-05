@@ -3,12 +3,14 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 import pymannkendall as mk
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 
 from app.schemas.models import (
     LinearRegressionResult,
     MannKendallResult,
     SeasonalMannKendallResult,
+    AutocorrelationResult,
+    PettittResult,
     StatisticalSummary
 )
 
@@ -29,7 +31,6 @@ def compute_linear_regression(df: pd.DataFrame, frequency: str) -> LinearRegress
             ci_95_upper=0.0
         )
     
-    # Calculate fractional years since starting point
     start_time = clean_df["date"].min()
     clean_df["decimal_years"] = (clean_df["date"] - start_time).dt.total_seconds() / (365.25 * 86400.0)
     
@@ -39,7 +40,6 @@ def compute_linear_regression(df: pd.DataFrame, frequency: str) -> LinearRegress
     res = stats.linregress(x, y)
     n = len(x)
     
-    # Degrees of freedom = n - 2
     dof = max(1, n - 2)
     t_crit = stats.t.ppf(0.975, dof)
     ci_lower = res.slope - (t_crit * res.stderr)
@@ -83,7 +83,6 @@ def compute_mann_kendall(df: pd.DataFrame) -> MannKendallResult:
             h=bool(res.h)
         )
     except Exception:
-        # Fallback manual Kendall tau if library fails
         tau, p_val = stats.kendalltau(np.arange(len(clean_vals)), clean_vals)
         trend_str = "increasing" if (p_val < 0.05 and tau > 0) else ("decreasing" if (p_val < 0.05 and tau < 0) else "no trend")
         return MannKendallResult(
@@ -104,11 +103,10 @@ def compute_seasonal_mann_kendall(df: pd.DataFrame, frequency: str) -> Optional[
         return None
     
     clean_df = df.dropna(subset=["date", "value"]).copy()
-    if len(clean_df) < 24:  # At least 2 full annual cycles needed
+    if len(clean_df) < 24:
         return None
     
     try:
-        # Ensure chronological ordering and monthly spacing
         vals = clean_df["value"].values
         res = mk.seasonal_test(vals, period=12)
         return SeasonalMannKendallResult(
@@ -135,12 +133,10 @@ def compute_sens_slope(df: pd.DataFrame, frequency: str) -> float:
         res = mk.sens_slope(vals)
         base_slope = float(res.slope)
     except Exception:
-        # SciPy Theil-Sen fallback
         x = np.arange(len(vals))
         res = stats.theilslopes(vals, x)
         base_slope = float(res[0])
     
-    # Scale to annual rate
     if frequency == "daily":
         annual_slope = base_slope * 365.25
     elif frequency == "monthly":
@@ -149,6 +145,143 @@ def compute_sens_slope(df: pd.DataFrame, frequency: str) -> float:
         annual_slope = base_slope
         
     return round(annual_slope, 4)
+
+def compute_autocorrelation(vals_or_df: Any, base_mk: Optional[MannKendallResult] = None) -> AutocorrelationResult:
+    """
+    Computes lag-1 autocorrelation (r1) and performs autocorrelation-adjusted Mann-Kendall test (Hamed-Rao / Yue-Pilon).
+    Accepts either (vals, base_mk) or a pandas DataFrame.
+    """
+    if isinstance(vals_or_df, pd.DataFrame):
+        vals = vals_or_df["value"].values.astype(float)
+        if base_mk is None:
+            base_mk = compute_mann_kendall(vals_or_df)
+    elif isinstance(vals_or_df, pd.Series):
+        vals = vals_or_df.values.astype(float)
+        if base_mk is None:
+            tau, p_val = stats.kendalltau(np.arange(len(vals)), vals)
+            base_mk = MannKendallResult(trend="increasing" if (p_val < 0.05 and tau > 0) else "no trend", p_value=float(p_val), z=0.0, tau=float(tau), s=0.0, var_s=0.0, h=bool(p_val < 0.05))
+    else:
+        vals = np.asarray(vals_or_df, dtype=float)
+        if base_mk is None:
+            clean_v = vals[~np.isnan(vals)]
+            tau, p_val = stats.kendalltau(np.arange(len(clean_v)), clean_v)
+            base_mk = MannKendallResult(trend="increasing" if (p_val < 0.05 and tau > 0) else "no trend", p_value=float(p_val), z=0.0, tau=float(tau), s=0.0, var_s=0.0, h=bool(p_val < 0.05))
+
+    clean_vals = vals[~np.isnan(vals)]
+    n = len(clean_vals)
+    if n < 8:
+        return AutocorrelationResult(
+            lag1=0.0,
+            is_significant=False,
+            critical_value=0.5,
+            adjusted_mk_p_value=base_mk.p_value,
+            adjusted_mk_trend=base_mk.trend,
+            explanation="Record too short to evaluate serial autocorrelation."
+        )
+
+    # Standard Pearson lag-1 correlation
+    x_mean = np.mean(clean_vals)
+    diff = clean_vals - x_mean
+    denominator = np.sum(diff ** 2)
+    if denominator <= 1e-12:
+        return AutocorrelationResult(
+            lag1=0.0,
+            is_significant=False,
+            critical_value=round(1.96 / np.sqrt(n), 3),
+            adjusted_mk_p_value=base_mk.p_value,
+            adjusted_mk_trend=base_mk.trend,
+            explanation="Zero variance detected in time-series."
+        )
+
+    r1 = float(np.sum(diff[:-1] * diff[1:]) / denominator)
+    crit_val = float(1.96 / np.sqrt(n))
+    is_sig = bool(abs(r1) > crit_val)
+
+    adj_p = base_mk.p_value
+    adj_trend = base_mk.trend
+
+    if is_sig:
+        try:
+            # Attempt pymannkendall Hamed-Rao or Yue-Pilon correlated test
+            res = mk.hamed_rao_modification_test(clean_vals)
+            adj_p = round(float(res.p), 6)
+            adj_trend = str(res.trend)
+        except Exception:
+            try:
+                res = mk.yue_pilon_modification_test(clean_vals)
+                adj_p = round(float(res.p), 6)
+                adj_trend = str(res.trend)
+            except Exception:
+                # Analytical variance inflation factor
+                eta = max(1.0, 1.0 + (2.0 / n) * (n - 1) * max(0.0, r1))
+                adj_var = base_mk.var_s * eta if base_mk.var_s > 0 else 1.0
+                adj_z = base_mk.s / np.sqrt(adj_var)
+                adj_p = round(float(2.0 * (1.0 - stats.norm.cdf(abs(adj_z)))), 6)
+                adj_trend = "increasing" if (adj_p < 0.05 and base_mk.s > 0) else ("decreasing" if (adj_p < 0.05 and base_mk.s < 0) else "no trend")
+
+    explanation = (
+        f"Lag-1 serial correlation is {r1:+.3f} (critical threshold: ±{crit_val:.3f}). "
+        + ("Significant autocorrelation detected; adjusted MK p-value accounts for persistence."
+           if is_sig else "No significant autocorrelation detected; standard Mann-Kendall test is valid.")
+    )
+
+    return AutocorrelationResult(
+        lag1=round(r1, 4),
+        is_significant=is_sig,
+        critical_value=round(crit_val, 4),
+        adjusted_mk_p_value=adj_p,
+        adjusted_mk_trend=adj_trend,
+        explanation=explanation
+    )
+
+def compute_pettitt_test(dates_or_df: Any, vals: Optional[np.ndarray] = None) -> Optional[PettittResult]:
+    """
+    Implements Pettitt's non-parametric rank test (Pettitt, 1979) for single change-point detection in central tendency.
+    Accepts either (dates, vals) or a pandas DataFrame.
+    """
+    if isinstance(dates_or_df, pd.DataFrame):
+        clean_df = dates_or_df.dropna(subset=["date", "value"]).copy()
+        dates = pd.to_datetime(clean_df["date"]).reset_index(drop=True)
+        vals = clean_df["value"].values.astype(float)
+    else:
+        dates = pd.to_datetime(dates_or_df).reset_index(drop=True) if isinstance(dates_or_df, pd.Series) else pd.to_datetime(pd.Series(dates_or_df))
+        if vals is None:
+            vals = dates.values.astype(float)
+
+    clean_mask = ~np.isnan(vals)
+    clean_vals = vals[clean_mask]
+    clean_dates = dates[clean_mask].reset_index(drop=True)
+    n = len(clean_vals)
+    if n < 10:
+        return None
+
+    # Calculate ranks
+    ranked = stats.rankdata(clean_vals)
+    # U_t = 2 * sum(ranked[:t]) - t * (n + 1)
+    cum_ranks = np.cumsum(ranked)
+    t_vals = np.arange(1, n + 1)
+    u_vals = 2 * cum_ranks - t_vals * (n + 1)
+
+    # Change point is at max absolute U
+    k_stat = np.max(np.abs(u_vals[:-1]))
+    tau_idx = int(np.argmax(np.abs(u_vals[:-1])))
+
+    # Approximate two-tailed p-value: p = 2 * exp(-6 * K^2 / (n^3 + n^2))
+    exponent = -6.0 * (k_stat ** 2) / (float(n) ** 3 + float(n) ** 2)
+    p_val = float(2.0 * np.exp(exponent))
+    p_val = min(1.0, max(0.0, p_val))
+
+    cp_date = clean_dates.iloc[tau_idx].strftime("%Y-%m-%d")
+    cp_year = int(clean_dates.iloc[tau_idx].year)
+
+    return PettittResult(
+        change_point_index=tau_idx,
+        change_point_date=cp_date,
+        change_point_year=cp_year,
+        k_statistic=round(float(k_stat), 2),
+        p_value=round(p_val, 5),
+        is_significant=bool(p_val < 0.05)
+    )
 
 def assess_trend_and_significance(
     ols_res: LinearRegressionResult,
@@ -180,6 +313,32 @@ def assess_trend_and_significance(
         
     return is_significant, trend_direction, status_color
 
+def build_executive_headline(
+    variable_name: str,
+    location_name: str,
+    start_year: str,
+    end_year: str,
+    trend_dir: str,
+    is_sig: bool,
+    slope_per_decade: float,
+    unit: str,
+    p_val: float
+) -> str:
+    """
+    Constructs a crisp, one-sentence plain English executive headline.
+    """
+    if is_sig:
+        action = "increased" if trend_dir == "increasing" else "decreased"
+        return (
+            f"Between {start_year} and {end_year}, {variable_name} in {location_name} {action} "
+            f"at a statistically significant rate of {slope_per_decade:+.2f} {unit}/decade (Mann-Kendall p = {p_val:.4f})."
+        )
+    else:
+        return (
+            f"Between {start_year} and {end_year}, {variable_name} in {location_name} showed no statistically significant "
+            f"monotonic trend (rate: {slope_per_decade:+.2f} {unit}/decade, p = {p_val:.4f} ≥ 0.05)."
+        )
+
 def generate_scientific_explanation(
     variable_name: str,
     unit: str,
@@ -194,15 +353,15 @@ def generate_scientific_explanation(
     r_squared: float
 ) -> Tuple[str, str]:
     """
-    Generates a rigorous scientific narrative grounded in statistical evidence and Earth systems science.
+    Generates a scientific narrative grounded in statistical evidence and Earth systems science.
     """
     period_str = f"{start_date[:4]} to {end_date[:4]}"
     
     if is_significant:
         significance_narrative = (
-            f"The observed {trend_direction} trend is **statistically significant** (Mann-Kendall p-value = {p_value:.5f} < 0.05). "
-            f"This indicates strong statistical confidence that the directional change in {variable_name.lower()} over the period {period_str} "
-            f"is unlikely to be a random fluctuation under the null hypothesis."
+            f"The observed {trend_direction} trend was **detected as statistically significant** (Mann-Kendall p-value = {p_value:.5f} < 0.05). "
+            f"This indicates that the directional shift in {variable_name.lower()} over {period_str} "
+            f"is unlikely to be explained solely by random multi-year weather noise under the null hypothesis."
         )
     else:
         significance_narrative = (
@@ -212,8 +371,8 @@ def generate_scientific_explanation(
         )
 
     rate_text = (
-        f"The non-parametric Sen's slope estimator indicates a rate of change of **{sens_slope:+.3f} {unit}/year** "
-        f"({sens_slope * 10:+.2f} {unit}/decade). Ordinary Least Squares linear regression reports **{ols_slope:+.3f} {unit}/year** "
+        f"The non-parametric Sen's slope estimator calculates a rate of change of **{sens_slope * 10:+.3f} {unit}/decade** "
+        f"({sens_slope:+.4f} {unit}/year). Ordinary Least Squares linear regression indicates {ols_slope * 10:+.3f} {unit}/decade "
         f"with an R² of {r_squared:.3f}."
     )
 
@@ -221,37 +380,37 @@ def generate_scientific_explanation(
     if "temperature" in variable_name.lower():
         if is_significant and trend_direction == "increasing":
             context = (
-                f"For {location_name}, this upward thermal trajectory aligns with observed regional warming and urban surface energy adjustments. "
-                "Rising 2-meter air temperatures reflect heightened sensible heat flux, reduced canopy evapotranspiration, and long-term greenhouse gas radiative forcing."
+                f"For {location_name}, this warming trajectory aligns with regional energy balance adjustments. "
+                "Near-surface warming is modulated by sensible heat fluxes, decreased vegetative evapotranspiration, and long-term greenhouse gas forcing."
             )
         else:
-            context = f"Temperature observations in {location_name} reflect balanced regional energy fluxes or counter-acting seasonal shifts over the analyzed window."
+            context = f"Temperature observations in {location_name} reflect balanced regional energy fluxes across the analyzed window."
     elif "precipitation" in variable_name.lower():
         context = (
-            f"Precipitation patterns in {location_name} are governed by synoptic monsoonal circulations. "
-            "Because rainfall distributions exhibit high natural skewness and multi-year interannual cycles (e.g. ENSO / IOD teleconnections), "
-            "non-parametric rank-based evaluation provides the most dependable gauge of long-term hydrological change."
+            f"Precipitation patterns in {location_name} are governed by regional synoptic monsoons and moisture advection. "
+            "Under the Clausius-Clapeyron relation, a warmer atmosphere holds ~7% more water vapor per 1°C, "
+            "frequently intensifying extreme convective rainbursts even when long-term total volume shows no monotonic trend."
         )
     elif "humidity" in variable_name.lower():
         context = (
-            f"Relative humidity trends in {location_name} describe atmospheric moisture saturation. "
-            "In warming urban corridors, relative humidity often decreases slightly even as absolute specific humidity rises, because warming accelerates saturation vapor pressure."
+            f"Relative humidity trends in {location_name} capture saturation deficit. "
+            "In warming urban or continental areas, relative humidity can decline even when specific humidity increases, because warming elevates saturation vapor pressure."
         )
     elif "wind" in variable_name.lower():
         context = (
-            f"Near-surface wind speeds in {location_name} reflect aerodynamic surface roughness changes and large-scale pressure gradient variations. "
-            "Documented terrestrial wind trends in literature frequently show decadal stilling followed by cyclical recovery."
+            f"Near-surface wind speeds in {location_name} describe aerodynamic boundary-layer flow and synoptic pressure gradients. "
+            "Literature documents multi-decadal terrestrial stilling followed in some regions by cyclical ocean-atmosphere recovery."
         )
     else:
-        context = f"Observations at {location_name} capture key surface boundary layer interactions across the analyzed multi-year timeframe."
+        context = f"Observations at {location_name} capture key surface boundary layer interactions across the analyzed timeframe."
 
     full_explanation = f"{significance_narrative}\n\n{rate_text}\n\n{context}"
     
     limitations = (
         "Methodology & Limitations:\n"
         "1. Grid-scale representation: NASA POWER / MERRA-2 data represents approximately a 0.5° x 0.625° (~50 km) grid cell average.\n"
-        "2. Statistical causality: Statistical significance establishes mathematical trend presence but does not isolate specific causative drivers (e.g., local urbanization vs. global greenhouse forcing).\n"
-        "3. Autocorrelation: While Mann-Kendall testing is robust against non-normality, persistent positive serial autocorrelation can slightly elevate rejection rates."
+        "2. Statistical detection vs. attribution: Trend significance demonstrates mathematical detection, not single-factor cause (e.g., local land-use change vs. global greenhouse forcing).\n"
+        "3. Serial correlation: Autocorrelation tests check for lag-1 persistence."
     )
     
     return full_explanation, limitations
@@ -269,17 +428,43 @@ def run_full_statistical_analysis(
     is_demonstration: bool
 ) -> StatisticalSummary:
     """
-    Executes full statistical pipeline: OLS, Mann-Kendall, Sen's slope, Seasonal MK, and scientific narrative.
+    Executes full statistical pipeline: OLS, Mann-Kendall, Sen's slope, Seasonal MK,
+    Autocorrelation check, Pettitt change-point test, and executive headline.
     """
     ols_res = compute_linear_regression(df, frequency)
     mk_res = compute_mann_kendall(df)
     smk_res = compute_seasonal_mann_kendall(df, frequency)
     sens_slope = compute_sens_slope(df, frequency)
     
+    clean_vals = df["value"].dropna().values
+    clean_dates = df.loc[df["value"].notna(), "date"]
+    
+    # 1. Autocorrelation Check & Adjusted MK
+    autocorr_res = compute_autocorrelation(clean_vals, mk_res)
+    
+    # 2. Pettitt Change-Point Test
+    pettitt_res = compute_pettitt_test(clean_dates, clean_vals)
+    
     is_sig, trend_dir, status_col = assess_trend_and_significance(ols_res, mk_res, sens_slope)
     
     var_name = variable_info.get("name", "Environmental Variable")
     unit_str = variable_info.get("unit_monthly", variable_info.get("unit", "")) if frequency == "monthly" else variable_info.get("unit", "")
+
+    rate_per_decade = round(sens_slope * 10.0, 4)
+    total_years = max(1.0, (pd.to_datetime(end_date) - pd.to_datetime(start_date)).days / 365.25)
+    total_change = round(sens_slope * total_years, 3)
+
+    headline = build_executive_headline(
+        variable_name=var_name,
+        location_name=location_name,
+        start_year=start_date[:4],
+        end_year=end_date[:4],
+        trend_dir=trend_dir,
+        is_sig=is_sig,
+        slope_per_decade=rate_per_decade,
+        unit=unit_str,
+        p_val=mk_res.p_value
+    )
 
     explanation, limitations = generate_scientific_explanation(
         variable_name=var_name,
@@ -315,10 +500,15 @@ def run_full_statistical_analysis(
         linear_regression=ols_res,
         mann_kendall=mk_res,
         seasonal_mann_kendall=smk_res,
+        autocorrelation=autocorr_res,
+        pettitt=pettitt_res,
         sens_slope_per_year=sens_slope,
+        rate_per_decade=rate_per_decade,
+        total_change=total_change,
         is_significant=is_sig,
         trend_direction=trend_dir,
         status_color=status_col,
+        headline=headline,
         scientific_explanation=explanation,
         methodology_limitations=limitations,
         source=source,

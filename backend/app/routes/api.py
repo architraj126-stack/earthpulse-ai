@@ -1,5 +1,7 @@
 import io
+import json
 from datetime import datetime
+from pathlib import Path
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -15,7 +17,9 @@ from app.schemas.models import (
     CompareResponse,
     AskQuestionRequest,
     AskQuestionResponse,
-    StatisticalSummary
+    StatisticalSummary,
+    AtlasCell,
+    AtlasResponse
 )
 from app.services.nasa_service import (
     VARIABLES_REGISTRY,
@@ -28,6 +32,21 @@ from app.services.report_service import generate_pdf_report
 from app.database.db import save_analysis, get_recent_analyses
 
 router = APIRouter(prefix="/api", tags=["EarthPulse API"])
+ATLAS_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "atlas"
+
+def load_atlas_file(variable: str) -> AtlasResponse:
+    target_path = ATLAS_DIR / f"{variable}.json"
+    if not target_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Atlas data for variable '{variable}' not found. Please run build_atlas.py."
+        )
+    try:
+        with open(target_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return AtlasResponse(**data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load atlas data: {str(e)}")
 
 @router.get("/health")
 def get_health():
@@ -261,6 +280,8 @@ def compare_regions(req: CompareRequest):
         elif summary_b.sens_slope_per_year > summary_a.sens_slope_per_year:
             higher_loc = req.location_b.name
 
+        diverging = bool((summary_a.sens_slope_per_year * summary_b.sens_slope_per_year) < 0 and (summary_a.is_significant or summary_b.is_significant))
+
         unit_str = var_info.get("unit_monthly", var_info.get("unit", "")) if req.frequency == "monthly" else var_info.get("unit", "")
 
         narrative = (
@@ -271,6 +292,8 @@ def compare_regions(req: CompareRequest):
             f"- **{req.location_b.name}**: Sen's slope = **{summary_b.sens_slope_per_year:+.4f} {unit_str}/year** "
             f"({'Statistically Significant, p=' + str(summary_b.mann_kendall.p_value) if summary_b.is_significant else 'No significant trend'})\n\n"
         )
+        if diverging:
+            narrative += f"⚠️ **Diverging Trends Alert**: The two selected regions are changing in opposite directions!\n\n"
         if higher_loc:
             narrative += f"**{higher_loc}** exhibits a higher rate of annual increase by **{abs(slope_diff):.4f} {unit_str}/year**."
         else:
@@ -285,6 +308,7 @@ def compare_regions(req: CompareRequest):
             comparison_time_series=comparison_pts,
             slope_difference_per_year=slope_diff,
             higher_warming_location=higher_loc,
+            diverging_trends=diverging,
             narrative=narrative,
             is_demonstration=bool(is_demo_a or is_demo_b)
         )
@@ -368,6 +392,8 @@ def export_csv(
     )
 
     csv_buffer = io.StringIO()
+    if is_demo:
+        csv_buffer.write("# WARNING: SAMPLE DATA - not NASA observations (demonstration mode)\n")
     # Add metadata header comments
     csv_buffer.write(f"# Platform: EarthPulse AI\n")
     csv_buffer.write(f"# Variable: {var_info['name']} ({variable})\n")
@@ -388,6 +414,22 @@ def export_csv(
         headers={"Content-Disposition": f"attachment; filename=earthpulse_{variable}_{safe_loc}.csv"}
     )
 
+@router.get("/atlas", response_model=AtlasResponse)
+def get_atlas(variable: str = Query("T2M")):
+    """Returns global precomputed Sen's slope and significance grid for a variable."""
+    return load_atlas_file(variable)
+
+@router.get("/atlas/top", response_model=List[AtlasCell])
+def get_top_atlas_cells(
+    variable: str = Query("T2M"),
+    n: int = Query(10, ge=1, le=50)
+):
+    """Returns top fastest-changing significant cells for a variable."""
+    atlas = load_atlas_file(variable)
+    sig_cells = [c for c in atlas.cells if c.is_significant]
+    sig_cells.sort(key=lambda x: abs(x.sens_slope_per_decade), reverse=True)
+    return sig_cells[:n]
+
 @router.get("/history")
 def get_history(limit: int = Query(15, ge=1, le=50)):
     """Retrieves previous user analysis runs from SQLite."""
@@ -396,7 +438,11 @@ def get_history(limit: int = Query(15, ge=1, le=50)):
 @router.post("/ai/ask", response_model=AskQuestionResponse)
 def ask_question(req: AskQuestionRequest):
     """Answers user scientific and data questions using the verified knowledge base and current statistical results."""
-    return ask_earthpulse_ai(question=req.question, current_analysis=req.current_analysis)
+    return ask_earthpulse_ai(
+        question=req.question,
+        current_analysis=req.current_analysis,
+        chat_history=req.chat_history
+    )
 
 @router.get("/knowledge")
 def list_knowledge_docs():

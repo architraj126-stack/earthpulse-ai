@@ -28,3 +28,6 @@ $$Z = \begin{cases} \frac{S - 1}{\sqrt{\text{Var}(S)}} & \text{if } S > 0 \\ 0 &
 - **Two-tailed p-value**:
 $$p = 2 \left( 1 - \Phi(|Z|) \right)$$
 where $\Phi$ is the standard normal cumulative distribution function. At a significance level of $\alpha = 0.05$, $H_0$ is rejected if $p < 0.05$ (or $|Z| > 1.96$).
+
+---
+**Source Reference:** [https://doi.org/10.2307/1907187](https://doi.org/10.2307/1907187)

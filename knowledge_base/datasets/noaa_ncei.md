@@ -19,3 +19,6 @@ NOAA NCEI hosts the world's most comprehensive archives of oceanic, atmospheric,
 
 ## Citation
 Menne, M. J., et al. (2012). "An Overview of the Global Historical Climatology Network-Daily Database." Journal of Atmospheric and Oceanic Technology, 29(7), 897-910. https://doi.org/10.1175/JTECH-D-11-00103.1.
+
+---
+**Source Reference:** [https://www.ncei.noaa.gov/](https://www.ncei.noaa.gov/)

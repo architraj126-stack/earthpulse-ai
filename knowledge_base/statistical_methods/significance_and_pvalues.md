@@ -19,3 +19,6 @@ The p-value is the probability of obtaining test results at least as extreme as 
 ## What Statistical Significance Does NOT Mean
 - **Significance Does Not Prove Anthropogenic Causation**: Rejecting $H_0$ confirms a directional trend is present in the numbers, but attributing that trend to greenhouse gas emissions vs. urban microclimate vs. natural multidecadal ocean oscillations requires physical fingerprinting and coupled climate model attribution.
 - **Statistical Significance vs. Practical Significance**: In huge datasets ($n > 15,000$ daily points), tiny, imperceptible slopes can achieve $p < 0.001$. Always examine both the rate of change (Sen's slope per decade) and the p-value together.
+
+---
+**Source Reference:** [https://doi.org/10.1080/00031305.2016.1154108](https://doi.org/10.1080/00031305.2016.1154108)
