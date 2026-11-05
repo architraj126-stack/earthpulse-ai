@@ -425,7 +425,9 @@ def run_full_statistical_analysis(
     end_date: str,
     frequency: str,
     source: str,
-    is_demonstration: bool
+    is_demonstration: bool,
+    is_ocean: bool = False,
+    ocean_advisory: str = ""
 ) -> StatisticalSummary:
     """
     Executes full statistical pipeline: OLS, Mann-Kendall, Sen's slope, Seasonal MK,
@@ -512,5 +514,7 @@ def run_full_statistical_analysis(
         scientific_explanation=explanation,
         methodology_limitations=limitations,
         source=source,
-        is_demonstration=is_demonstration
+        is_demonstration=is_demonstration,
+        is_ocean=is_ocean,
+        ocean_advisory=ocean_advisory
     )

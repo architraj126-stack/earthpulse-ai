@@ -11,6 +11,7 @@ const AtlasPage = lazy(() => import('./pages/AtlasPage'));
 const ComparePage = lazy(() => import('./pages/ComparePage'));
 const KnowledgeBasePage = lazy(() => import('./pages/KnowledgeBasePage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
+const DetectiveCasesPage = lazy(() => import('./pages/DetectiveCasesPage'));
 
 export default function App() {
   return (
@@ -23,6 +24,8 @@ export default function App() {
               <Route path="/" element={<LandingPage />} />
               <Route path="/investigate" element={<DashboardPage />} />
               <Route path="/dashboard" element={<Navigate to="/investigate" replace />} />
+              <Route path="/cases" element={<DetectiveCasesPage />} />
+              <Route path="/detective" element={<Navigate to="/cases" replace />} />
               <Route path="/atlas" element={<AtlasPage />} />
               <Route path="/compare" element={<ComparePage />} />
               <Route path="/learn" element={<KnowledgeBasePage />} />

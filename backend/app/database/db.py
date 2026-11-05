@@ -72,7 +72,7 @@ def save_analysis(
 ) -> int:
     conn = get_connection()
     cursor = conn.cursor()
-    now_str = datetime.utcnow().isoformat()
+    now_str = datetime.now().isoformat()
     cursor.execute("""
     INSERT INTO analysis_history (
         created_at, variable, variable_name, location_name, latitude, longitude,
@@ -115,7 +115,7 @@ def get_cached_response(cache_key: str) -> Optional[Dict[str, Any]]:
 def set_cached_response(cache_key: str, url: str, data: Dict[str, Any]):
     conn = get_connection()
     cursor = conn.cursor()
-    now_str = datetime.utcnow().isoformat()
+    now_str = datetime.now().isoformat()
     cursor.execute("""
     INSERT OR REPLACE INTO nasa_cache (cache_key, url, data_json, cached_at)
     VALUES (?, ?, ?, ?)

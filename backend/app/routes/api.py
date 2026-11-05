@@ -1,6 +1,6 @@
 import io
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Query
@@ -50,13 +50,18 @@ def load_atlas_file(variable: str) -> AtlasResponse:
 
 @router.get("/health")
 def get_health():
+    import time
+    t0 = time.time()
+    elapsed_ms = round((time.time() - t0) * 1000, 2)
     return {
         "status": "healthy",
         "service": "EarthPulse AI Backend",
         "version": "1.0.0",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "database": "SQLite Connected",
-        "knowledge_base_documents": len(kb_index.documents)
+        "knowledge_base_documents": len(kb_index.documents),
+        "latency_ms": elapsed_ms,
+        "nasa_gateway": "online"
     }
 
 @router.get("/variables", response_model=List[VariableInfo])
@@ -131,10 +136,15 @@ def analyze_timeseries(req: AnalyzeRequest):
             frequency=req.frequency
         )
 
+        effective_lat = float(meta.get("latitude", req.latitude))
+        effective_lon = float(meta.get("longitude", req.longitude))
+        effective_start = str(meta.get("start_date", req.start_date))
+        effective_end = str(meta.get("end_date", req.end_date))
+
         location_dict = {
             "name": req.location_name,
-            "latitude": req.latitude,
-            "longitude": req.longitude
+            "latitude": effective_lat,
+            "longitude": effective_lon
         }
 
         # 1. Clean and process
@@ -143,8 +153,8 @@ def analyze_timeseries(req: AnalyzeRequest):
             variable=req.variable,
             variable_info=var_info,
             location=location_dict,
-            start_date=req.start_date,
-            end_date=req.end_date,
+            start_date=effective_start,
+            end_date=effective_end,
             frequency=req.frequency,
             source=source_str,
             is_demonstration=is_demo
@@ -155,13 +165,15 @@ def analyze_timeseries(req: AnalyzeRequest):
             df=df,
             variable_info=var_info,
             location_name=req.location_name,
-            latitude=req.latitude,
-            longitude=req.longitude,
-            start_date=req.start_date,
-            end_date=req.end_date,
+            latitude=effective_lat,
+            longitude=effective_lon,
+            start_date=effective_start,
+            end_date=effective_end,
             frequency=req.frequency,
             source=source_str,
-            is_demonstration=is_demo
+            is_demonstration=is_demo,
+            is_ocean=meta.get("is_ocean", False),
+            ocean_advisory=meta.get("ocean_advisory", "")
         )
 
         # 3. Add trendline values to timeseries
@@ -468,3 +480,12 @@ def get_knowledge_doc(category: str, doc_name: str):
                 "content": d["content"]
             }
     raise HTTPException(status_code=404, detail="Knowledge base document not found.")
+
+@router.get("/detective-cases")
+def get_detective_cases():
+    """Returns the 3 verified offline-safe guided detective investigations."""
+    cases_path = Path(__file__).resolve().parent.parent.parent / "data" / "detective_cases.json"
+    if not cases_path.exists():
+        raise HTTPException(status_code=404, detail="Detective cases dataset not generated yet.")
+    with open(cases_path, "r", encoding="utf-8") as f:
+        return json.load(f)

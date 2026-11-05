@@ -1,22 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Globe, Search, Layers, GitCompare, BookOpen, History, ArrowRight } from 'lucide-react';
+import { Globe, Search, Layers, GitCompare, BookOpen, History, ArrowRight, Compass } from 'lucide-react';
 import { getHealth } from '../services/api';
 import HistoryDrawer from './HistoryDrawer';
 
 export default function Navbar() {
   const location = useLocation();
-  const [healthy, setHealthy] = useState(null);
+  const [gatewayStatus, setGatewayStatus] = useState('checking'); // 'online' | 'slow' | 'offline'
+  const [latency, setLatency] = useState(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   useEffect(() => {
+    const t0 = performance.now();
     getHealth()
-      .then(res => setHealthy(res.status === 'healthy'))
-      .catch(() => setHealthy(false));
+      .then(res => {
+        const elapsed = Math.round(performance.now() - t0);
+        setLatency(elapsed);
+        if (elapsed > 1500) {
+          setGatewayStatus('slow');
+        } else {
+          setGatewayStatus('online');
+        }
+      })
+      .catch(() => {
+        setGatewayStatus('offline');
+      });
   }, []);
 
   const navLinks = [
     { name: 'Investigate', path: '/investigate', alias: '/dashboard', icon: Search },
+    { name: 'Cases', path: '/cases', alias: '/detective', icon: Compass },
     { name: 'Atlas', path: '/atlas', icon: Layers },
     { name: 'Compare', path: '/compare', icon: GitCompare },
     { name: 'Learn', path: '/learn', alias: '/knowledge', icon: BookOpen },
@@ -86,10 +99,21 @@ export default function Navbar() {
               <span className="hidden sm:inline">History</span>
             </button>
 
-            {/* Live Engine Status */}
-            <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#0D1B2A] border border-[#1E3A56] text-[11px] text-slate-400">
-              <span className={`w-2 h-2 rounded-full ${healthy ? 'bg-[#35D07F] shadow-[0_0_8px_#35D07F]' : 'bg-[#FF4D4D]'}`}></span>
-              <span>{healthy ? 'NASA Engine Online' : 'Connecting...'}</span>
+            {/* Live Engine Status with Latency */}
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#0D1B2A] border border-[#1E3A56] text-[11px] font-mono">
+              <span className={`w-2 h-2 rounded-full ${
+                gatewayStatus === 'online'
+                  ? 'bg-[#35D07F] shadow-[0_0_8px_#35D07F]'
+                  : gatewayStatus === 'slow'
+                  ? 'bg-amber-400 shadow-[0_0_8px_#F59E0B]'
+                  : 'bg-[#FF4D4D] shadow-[0_0_8px_#FF4D4D]'
+              }`} />
+              <span className="text-slate-300">
+                {gatewayStatus === 'online' && `NASA Live (${latency || 120}ms)`}
+                {gatewayStatus === 'slow' && `NASA Slow (${latency}ms)`}
+                {gatewayStatus === 'offline' && 'Offline (Demo Fallback)'}
+                {gatewayStatus === 'checking' && 'Connecting...'}
+              </span>
             </div>
           </div>
 

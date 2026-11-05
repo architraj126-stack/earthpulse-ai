@@ -77,6 +77,25 @@ def generate_cache_key(lat: float, lon: float, param: str, start_date: str, end_
     key_str = f"{round(lat, 4)}:{round(lon, 4)}:{param}:{start_date}:{end_date}:{freq}"
     return hashlib.sha256(key_str.encode("utf-8")).hexdigest()
 
+def is_ocean_point(latitude: float, longitude: float) -> bool:
+    """
+    Fast, coarse approximation to identify deep oceanic coordinates.
+    """
+    lat, lon = latitude, longitude
+    if lat > 80 or lat < -65:
+        return lat >= -60  # Deep Southern Ocean vs Antarctica
+    if 15 <= lat <= 70 and -165 <= lon <= -55:
+        return False  # North America
+    if -55 <= lat <= 12 and -80 <= lon <= -35:
+        return False  # South America
+    if -35 <= lat <= 70 and -18 <= lon <= 50:
+        return False  # Europe & Africa
+    if 5 <= lat <= 75 and 50 <= lon <= 170:
+        return False  # Asia
+    if -45 <= lat <= -10 and 112 <= lon <= 178:
+        return False  # Australia
+    return True  # Open ocean (Pacific, Atlantic, Indian, Southern)
+
 def fetch_nasa_power_data(
     latitude: float,
     longitude: float,
@@ -86,36 +105,64 @@ def fetch_nasa_power_data(
     frequency: str = "monthly"
 ) -> Tuple[pd.DataFrame, bool, str, Dict[str, Any]]:
     """
-    Fetches real NASA POWER data.
+    Fetches real NASA POWER data with retry backoff, timeouts, and demo fallback.
     Returns: (DataFrame, is_demonstration, source_attribution, metadata)
     """
-    # 1. Validation
-    if not (-90.0 <= latitude <= 90.0):
-        raise ValueError(f"Latitude {latitude} is outside valid range [-90, 90].")
-    if not (-180.0 <= longitude <= 180.0):
-        raise ValueError(f"Longitude {longitude} is outside valid range [-180, 180].")
+    import time
+
+    # 1. Coordinate & parameter validation with clamping
+    clamped_lat = max(-90.0, min(90.0, float(latitude)))
+    # Normalize longitude to [-180, 180]
+    clamped_lon = ((float(longitude) + 180.0) % 360.0) - 180.0
     
     param_info = VARIABLES_REGISTRY.get(parameter)
     if not param_info:
         raise ValueError(f"Parameter '{parameter}' is not supported. Supported: {list(VARIABLES_REGISTRY.keys())}")
-    
+
+    # Parse and clamp date range
+    now_dt = datetime.now()
+    try:
+        start_dt = datetime.strptime(start_date[:10], "%Y-%m-%d")
+    except Exception:
+        start_dt = datetime(1990, 1, 1)
+    try:
+        end_dt = datetime.strptime(end_date[:10], "%Y-%m-%d")
+    except Exception:
+        end_dt = now_dt
+
+    # Handle inverted date range
+    if start_dt > end_dt:
+        start_dt, end_dt = end_dt, start_dt
+
+    # Handle future date range
+    if end_dt > now_dt:
+        end_dt = now_dt
+
+    start_date = start_dt.strftime("%Y-%m-%d")
+    end_date = end_dt.strftime("%Y-%m-%d")
+
+    is_ocean = is_ocean_point(clamped_lat, clamped_lon)
+    ocean_msg = (
+        "Selected coordinate is over an oceanic cell. Observations represent satellite radiometry "
+        "and GEOS-5/MERRA-2 atmospheric data assimilation rather than ground weather station networks."
+        if is_ocean else None
+    )
+
     # 2. Check Cache
-    cache_key = generate_cache_key(latitude, longitude, parameter, start_date, end_date, frequency)
+    cache_key = generate_cache_key(clamped_lat, clamped_lon, parameter, start_date, end_date, frequency)
     cached_data = get_cached_response(cache_key)
     if cached_data and "records" in cached_data:
-        logger.info(f"Using cached NASA POWER data for {parameter} at ({latitude}, {longitude})")
+        logger.info(f"Using cached NASA POWER data for {parameter} at ({clamped_lat}, {clamped_lon})")
         df = pd.DataFrame(cached_data["records"])
         df["date"] = pd.to_datetime(df["date"])
         is_demo = cached_data.get("is_demonstration", False)
         source = cached_data.get("source", param_info["source"])
         meta = cached_data.get("metadata", {})
+        meta["is_ocean"] = is_ocean
+        meta["ocean_advisory"] = ocean_msg
         return df, is_demo, source, meta
 
     # 3. Format endpoint & date arguments for NASA POWER API
-    # Frequency: 'daily' requires YYYYMMDD; 'monthly' requires YYYY
-    start_dt = datetime.strptime(start_date[:10], "%Y-%m-%d")
-    end_dt = datetime.strptime(end_date[:10], "%Y-%m-%d")
-    
     if frequency == "daily":
         api_endpoint = f"{NASA_POWER_BASE}/daily/point"
         start_arg = start_dt.strftime("%Y%m%d")
@@ -129,8 +176,8 @@ def fetch_nasa_power_data(
         f"{api_endpoint}?"
         f"parameters={parameter}&"
         f"community=RE&"
-        f"longitude={longitude:.4f}&"
-        f"latitude={latitude:.4f}&"
+        f"longitude={clamped_lon:.4f}&"
+        f"latitude={clamped_lat:.4f}&"
         f"start={start_arg}&"
         f"end={end_arg}&"
         f"format=JSON"
@@ -140,85 +187,99 @@ def fetch_nasa_power_data(
         "User-Agent": "EarthPulseAI/1.0 (Earth Science Analysis Platform; https://earthpulse.ai)"
     }
 
-    try:
-        logger.info(f"Querying real NASA POWER API: {url}")
-        response = requests.get(url, headers=headers, timeout=12)
-        response.raise_for_status()
-        raw_json = response.json()
-        
-        # Parse NASA JSON structure
-        # Expected: raw_json["properties"]["parameter"][parameter] = {"YYYYMMDD": val, ...}
-        param_data = raw_json.get("properties", {}).get("parameter", {}).get(parameter, {})
-        if not param_data:
-            raise ValueError(f"NASA POWER response did not contain parameter data for {parameter}")
+    # Exponential backoff retry loop (2 retries: 1s, 2s delay)
+    max_retries = 2
+    last_exception = None
 
-        records = []
-        for dt_key, raw_val in param_data.items():
-            # In monthly data, NASA includes a 13th month entry "YYYY13" representing the annual mean.
-            # We must ignore "YYYY13" to avoid duplicate/distorted monthly records!
-            if frequency == "monthly" and dt_key.endswith("13"):
-                continue
-
-            # Check missing flag (-999.0 or -999)
-            val = float(raw_val) if raw_val is not None else np.nan
-            if abs(val - (-999.0)) < 0.01:
-                val = np.nan
+    for attempt in range(max_retries + 1):
+        try:
+            logger.info(f"Querying real NASA POWER API (attempt {attempt + 1}): {url}")
+            # Timeout: 3.05s connect, 8.0s read
+            response = requests.get(url, headers=headers, timeout=(3.05, 8.0))
+            response.raise_for_status()
+            raw_json = response.json()
             
-            # Parse date string
-            if frequency == "daily":
-                parsed_date = datetime.strptime(dt_key, "%Y%m%d").strftime("%Y-%m-%d")
+            param_data = raw_json.get("properties", {}).get("parameter", {}).get(parameter, {})
+            if not param_data:
+                raise ValueError(f"NASA POWER response did not contain parameter data for {parameter}")
+
+            records = []
+            for dt_key, raw_val in param_data.items():
+                if frequency == "monthly" and dt_key.endswith("13"):
+                    continue
+
+                val = float(raw_val) if raw_val is not None else np.nan
+                if abs(val - (-999.0)) < 0.01:
+                    val = np.nan
+
+                if frequency == "daily":
+                    parsed_date = datetime.strptime(dt_key, "%Y%m%d").strftime("%Y-%m-%d")
+                else:
+                    parsed_date = datetime.strptime(dt_key, "%Y%m").strftime("%Y-%m-01")
+
+                records.append({
+                    "date": parsed_date,
+                    "value": val
+                })
+
+            df = pd.DataFrame(records)
+            df["date"] = pd.to_datetime(df["date"])
+            df = df.sort_values("date").reset_index(drop=True)
+            df = df[(df["date"] >= pd.to_datetime(start_date)) & (df["date"] <= pd.to_datetime(end_date))].reset_index(drop=True)
+
+            is_demonstration = False
+            source_str = f"Real NASA POWER API ({param_info['source']})"
+            metadata = {
+                "query_url": url,
+                "latitude": clamped_lat,
+                "longitude": clamped_lon,
+                "start_date": start_date,
+                "end_date": end_date,
+                "elevation": raw_json.get("geometry", {}).get("coordinates", [0, 0, 0])[2] if len(raw_json.get("geometry", {}).get("coordinates", [])) > 2 else None,
+                "is_ocean": is_ocean,
+                "ocean_advisory": ocean_msg
+            }
+
+            # Cache the successful response
+            try:
+                cache_payload = {
+                    "records": [{"date": r["date"].strftime("%Y-%m-%d"), "value": None if pd.isna(r["value"]) else r["value"]} for _, r in df.iterrows()],
+                    "is_demonstration": False,
+                    "source": source_str,
+                    "metadata": metadata
+                }
+                set_cached_response(cache_key, cache_payload)
+            except Exception:
+                pass
+
+            return df, is_demonstration, source_str, metadata
+
+        except Exception as e:
+            last_exception = e
+            if attempt < max_retries:
+                sleep_time = 1.0 * (2 ** attempt)
+                logger.warning(f"NASA POWER attempt {attempt + 1} failed ({str(e)}). Retrying in {sleep_time}s...")
+                time.sleep(sleep_time)
             else:
-                # "YYYYMM" format
-                parsed_date = datetime.strptime(dt_key, "%Y%m").strftime("%Y-%m-01")
+                logger.error(f"NASA POWER API unreachable after {max_retries + 1} attempts. Falling back to calibrated demonstration dataset.")
 
-            records.append({
-                "date": parsed_date,
-                "value": val
-            })
-
-        df = pd.DataFrame(records)
-        df["date"] = pd.to_datetime(df["date"])
-        df = df.sort_values("date").reset_index(drop=True)
-        
-        # Filter to requested range
-        df = df[(df["date"] >= pd.to_datetime(start_date)) & (df["date"] <= pd.to_datetime(end_date))].reset_index(drop=True)
-
-        is_demonstration = False
-        source_str = f"Real NASA POWER API ({param_info['source']})"
-        metadata = {
-            "query_url": url,
-            "elevation": raw_json.get("geometry", {}).get("coordinates", [0, 0, 0])[2] if len(raw_json.get("geometry", {}).get("coordinates", [])) > 2 else None,
-            "header": raw_json.get("header", {}),
-            "fill_value": "-999.0",
-            "is_demonstration": False
-        }
-
-        # Save to SQLite Cache
-        cache_payload = {
-            "records": [{"date": r["date"].strftime("%Y-%m-%d"), "value": None if np.isnan(r["value"]) else float(r["value"])} for _, r in df.iterrows()],
-            "is_demonstration": False,
-            "source": source_str,
-            "metadata": metadata
-        }
-        set_cached_response(cache_key, url, cache_payload)
-
-        return df, is_demonstration, source_str, metadata
-
-    except Exception as exc:
-        logger.warning(f"Live NASA POWER request failed ({str(exc)}). Generating physically-faithful labeled demonstration dataset.")
-        # Clearly flag demonstration data
-        df_demo, meta_demo = generate_demonstration_dataset(
-            latitude=latitude,
-            longitude=longitude,
-            parameter=parameter,
-            start_date=start_date,
-            end_date=end_date,
-            frequency=frequency,
-            error_reason=str(exc)
-        )
-        is_demonstration = True
-        source_str = "DEMONSTRATION DATASET (NASA API Offline/Network-Isolated Fallback)"
-        return df_demo, is_demonstration, source_str, meta_demo
+    # 4. Graceful Fallback: Generate calibrated dataset so demo NEVER crashes
+    df_demo, meta_demo = generate_demonstration_dataset(
+        latitude=clamped_lat,
+        longitude=clamped_lon,
+        parameter=parameter,
+        start_date=start_date,
+        end_date=end_date,
+        frequency=frequency
+    )
+    meta_demo["latitude"] = clamped_lat
+    meta_demo["longitude"] = clamped_lon
+    meta_demo["start_date"] = start_date
+    meta_demo["end_date"] = end_date
+    meta_demo["fallback_reason"] = str(last_exception)
+    meta_demo["is_ocean"] = is_ocean
+    meta_demo["ocean_advisory"] = ocean_msg
+    return df_demo, True, f"Calibrated Demonstration Dataset (NASA API Fallback: {str(last_exception)})", meta_demo
 
 
 def generate_demonstration_dataset(

@@ -54,6 +54,8 @@ class DataResponse(BaseModel):
     frequency: str
     source: str
     is_demonstration: bool
+    is_ocean: Optional[bool] = False
+    ocean_advisory: Optional[str] = ''
     data_quality: DataQuality
     time_series: List[DataPoint]
     yearly_averages: List[YearlyDataPoint]
@@ -150,6 +152,8 @@ class StatisticalSummary(BaseModel):
     methodology_limitations: str
     source: str
     is_demonstration: bool
+    is_ocean: Optional[bool] = False
+    ocean_advisory: Optional[str] = ''
 
 class AnalyzeResponse(BaseModel):
     summary: StatisticalSummary
