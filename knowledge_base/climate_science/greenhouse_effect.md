@@ -18,3 +18,6 @@ Atmospheric trace gases with three or more atoms possess vibrational and rotatio
 
 ## Radiative Forcing Mechanism
 Elevated concentrations of GHGs increase the optical depth of the atmosphere in thermal infrared absorption bands, raising the effective altitude from which infrared radiation escapes to space. Because the troposphere cools with altitude (environmental lapse rate $\Gamma \approx 6.5^\circ\text{C/km}$), radiation to space is emitted at colder, less intense temperatures, creating an energy imbalance ($F_{\text{in}} > F_{\text{out}}$). The planet warms until surface temperatures increase enough to restore radiative equilibrium.
+
+---
+**Source Reference:** [https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/](https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/)

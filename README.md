@@ -116,7 +116,7 @@ python csv/
 │   ├── package.json
 │   ├── tailwind.config.js
 │   └── vite.config.js
-├── knowledge_base/                    # 28 Structured peer-reviewed scientific articles
+├── knowledge_base/                    # 28 Curated summaries of NASA, NOAA, WMO and IPCC documentation
 │   ├── datasets/                      # NASA POWER, MODIS, GPM, GLDAS, MERRA-2, NOAA, IPCC
 │   ├── environmental_variables/       # T2M, PRECTOTCORR, RH2M, WS2M, Solar, NDVI, LST
 │   ├── climate_science/               # Greenhouse effect, UHI, Hydrological scaling

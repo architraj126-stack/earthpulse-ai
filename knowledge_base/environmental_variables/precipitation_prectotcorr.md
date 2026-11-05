@@ -18,3 +18,6 @@
 ## Typical Characteristics & Statistical Caveats
 - **Non-Gaussian Skewed Distribution**: Precipitation features a high frequency of zero-rain days followed by extreme positive skewness on wet days (well described by Gamma or Tweedie distributions).
 - **Trend Detection Rules**: Because precipitation is non-normally distributed and prone to extreme outliers, **Ordinary Least Squares (OLS) linear regression can produce misleading slopes**. Non-parametric tests (**Mann-Kendall test** and **Sen's slope estimator**) are the scientifically rigorous standard for precipitation trend analysis.
+
+---
+**Source Reference:** [https://power.larc.nasa.gov/docs/methodology/meteorology/precipitation/](https://power.larc.nasa.gov/docs/methodology/meteorology/precipitation/)

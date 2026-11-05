@@ -27,3 +27,6 @@ IMERG intercalibrates, merges, and interpolates:
 
 ## Citation
 Huffman, G. J., et al. (2020). "The Integrated Multi-satellitE Retrievals for GPM (IMERG)." In: Satellite Precipitation Measurement, Advances in Global Change Research, vol 67. Springer, Cham.
+
+---
+**Source Reference:** [https://gpm.nasa.gov/](https://gpm.nasa.gov/)

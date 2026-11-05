@@ -23,3 +23,6 @@
 ## Statistical Analysis Recommendations
 - Temperature distributions are generally Gaussian-like, making both Ordinary Least Squares (OLS) Linear Regression and non-parametric Mann-Kendall / Sen's slope tests appropriate.
 - Serial correlation (lag-1 autocorrelation) is prevalent in daily temperature series; for strict daily trend testing, pre-whitening or monthly aggregation is recommended.
+
+---
+**Source Reference:** [https://power.larc.nasa.gov/docs/methodology/meteorology/surface-temperature/](https://power.larc.nasa.gov/docs/methodology/meteorology/surface-temperature/)

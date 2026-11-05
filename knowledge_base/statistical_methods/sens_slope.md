@@ -29,3 +29,6 @@ When analyzing daily data ($i$ measured in days), the daily Sen's slope is multi
 $$\text{Annual Rate of Change} = \beta_{\text{Sen, daily}} \times 365.25$$
 For monthly time series, the monthly Sen's slope is multiplied by 12:
 $$\text{Annual Rate of Change} = \beta_{\text{Sen, monthly}} \times 12$$
+
+---
+**Source Reference:** [https://doi.org/10.1080/01621459.1968.10480934](https://doi.org/10.1080/01621459.1968.10480934)

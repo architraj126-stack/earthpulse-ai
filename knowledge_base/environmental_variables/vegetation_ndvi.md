@@ -24,3 +24,6 @@ Where:
 ## Environmental Trends & Applications
 - **Global Greening vs. Browning**: Satellite time-series (1982–present) demonstrate significant greening across vast high-latitude and agricultural regions (driven by CO₂ fertilization, extended growing seasons, and intensive irrigation), contrasted with regional browning in drought-stricken biomes.
 - **Drought Monitoring**: Vegetation Condition Index (VCI) anomalies identify agricultural drought onset before hydrological indicators react.
+
+---
+**Source Reference:** [https://lpdaac.usgs.gov/products/mod13a2v006/](https://lpdaac.usgs.gov/products/mod13a2v006/)

@@ -19,3 +19,6 @@ NASA POWER computes `WS2M` from model 10-meter wind vectors by scaling down usin
 - **Global Stilling & Reversal**: Multiple climatological studies document terrestrial "stilling" (decreased near-surface wind speeds) during 1980–2010, followed in some regions by post-2010 recovery, linked to changes in large-scale ocean-atmospheric circulation and surface roughness growth.
 - **Atmospheric Dispersion**: Lower wind speeds reduce boundary-layer ventilation, exacerbating urban particulate pollution ($PM_{2.5}$) trapping during winter inversions.
 - **Renewable Energy & Evaporation**: Key factor for small wind power assessment and Penman-Monteith potential evapotranspiration.
+
+---
+**Source Reference:** [https://power.larc.nasa.gov/docs/methodology/meteorology/wind/](https://power.larc.nasa.gov/docs/methodology/meteorology/wind/)

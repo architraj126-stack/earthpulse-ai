@@ -17,3 +17,6 @@ $$e_s(T) \approx 0.61078 \exp\left(\frac{17.27 T}{T + 237.3}\right) \text{ kPa}$
 - **Human Heat Stress & Wet-Bulb Temperature**: High temperature coupled with high relative humidity impairs human evaporative perspiration cooling, elevating the heat index and lethal wet-bulb temperature ($T_w$) thresholds.
 - **Fire Weather & Evaporation**: Low relative humidity (< 30%) desiccates forest fuel loads and topsoil, escalating wildfire vulnerability.
 - **Atmospheric Drying vs. Specific Humidity**: In many warming continental interiors, specific humidity (absolute water vapor mass) increases, yet relative humidity decreases because atmospheric warming increases $e_s(T)$ faster than moisture is replenished from dry land surfaces.
+
+---
+**Source Reference:** [https://power.larc.nasa.gov/docs/methodology/meteorology/humidity/](https://power.larc.nasa.gov/docs/methodology/meteorology/humidity/)

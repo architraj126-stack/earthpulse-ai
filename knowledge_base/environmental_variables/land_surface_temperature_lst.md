@@ -17,3 +17,6 @@ In contrast, **T2M** is the temperature of the air mixed by turbulence at 2 metr
 ## Environmental Significance
 - **Surface Urban Heat Island (SUHI)**: Satellite thermal sensors map thermal anomalies across metropolitan areas, exposing heat vulnerability disparities.
 - **Evapotranspiration Estimation**: Used in energy balance models (such as SEBAL and METRIC) to estimate field-scale agricultural water consumption.
+
+---
+**Source Reference:** [https://lpdaac.usgs.gov/products/mod11a2v006/](https://lpdaac.usgs.gov/products/mod11a2v006/)

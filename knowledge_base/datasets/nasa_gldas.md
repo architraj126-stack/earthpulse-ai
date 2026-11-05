@@ -28,3 +28,6 @@ GLDAS is a joint project developed by NASA Goddard Space Flight Center (GSFC) an
 
 ## Citation
 Rodell, M., et al. (2004). "The Global Land Data Assimilation System." Bulletin of the American Meteorological Society, 85(3), 381-394. https://doi.org/10.1175/BAMS-85-3-381.
+
+---
+**Source Reference:** [https://ldas.gsfc.nasa.gov/gldas](https://ldas.gsfc.nasa.gov/gldas)

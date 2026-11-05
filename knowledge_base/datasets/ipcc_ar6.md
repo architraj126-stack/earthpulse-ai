@@ -25,3 +25,6 @@ The IPCC standardizes certainty using calibrated qualitative language:
 
 ## Citation
 IPCC, 2021: Climate Change 2021: The Physical Science Basis. Contribution of Working Group I to the Sixth Assessment Report of the Intergovernmental Panel on Climate Change. Cambridge University Press. https://doi.org/10.1017/9781009157896.
+
+---
+**Source Reference:** [https://www.ipcc.ch/report/ar6/wg1/](https://www.ipcc.ch/report/ar6/wg1/)

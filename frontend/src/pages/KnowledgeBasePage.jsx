@@ -59,7 +59,7 @@ export default function KnowledgeBasePage() {
           Verified Earth Science & Statistical Library
         </h1>
         <p className="text-xs sm:text-sm text-[#9BAEC2] max-w-2xl">
-          Curated collection of peer-reviewed methodologies, NASA observation guides, WMO standards, and IPCC AR6 physics foundations.
+          Curated collection of verified methodologies from NASA, NOAA, WMO, and IPCC, NASA observation guides, WMO standards, and IPCC AR6 physics foundations.
         </p>
       </div>
 

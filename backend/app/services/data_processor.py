@@ -50,13 +50,60 @@ def clean_and_process_timeseries(
         date_range_covered=date_cov_str
     )
     
-    # 4. Standard time series data points
+    # 4. Monthly climatological baseline & anomalies
+    df["month"] = df["date"].dt.month
+    month_means = df.groupby("month")["value"].mean().to_dict()
+
+    # Calculate trend line and 95% CI band for valid points
+    valid_mask = df["value"].notna()
+    valid_df = df[valid_mask].copy()
+    n_valid = len(valid_df)
+    
+    ci_lower_dict = {}
+    ci_upper_dict = {}
+    
+    if n_valid >= 3:
+        x_vals = np.arange(n_valid, dtype=float)
+        y_vals = valid_df["value"].values.astype(float)
+        
+        # Fit linear trend
+        slope, intercept = np.polyfit(x_vals, y_vals, 1)
+        y_pred = intercept + slope * x_vals
+        residuals = y_vals - y_pred
+        
+        dof = max(1, n_valid - 2)
+        s_err = np.sqrt(np.sum(residuals**2) / dof)
+        x_mean = np.mean(x_vals)
+        ss_x = np.sum((x_vals - x_mean)**2)
+        
+        t_val = 1.96
+        if ss_x > 0:
+            se_band = s_err * np.sqrt(1.0 / n_valid + (x_vals - x_mean)**2 / ss_x)
+        else:
+            se_band = np.full_like(x_vals, s_err)
+            
+        ci_lowers = y_pred - t_val * se_band
+        ci_uppers = y_pred + t_val * se_band
+        
+        valid_indices = valid_df.index
+        for idx, low, high in zip(valid_indices, ci_lowers, ci_uppers):
+            ci_lower_dict[idx] = round(float(low), 2)
+            ci_upper_dict[idx] = round(float(high), 2)
+
+    # Standard time series data points
     time_series: List[DataPoint] = []
-    for _, row in df.iterrows():
+    for idx, row in df.iterrows():
         val = None if pd.isna(row["value"]) else round(float(row["value"]), 2)
+        anomaly_val = None
+        if val is not None and row["month"] in month_means and not pd.isna(month_means[row["month"]]):
+            anomaly_val = round(float(val - month_means[row["month"]]), 2)
+            
         time_series.append(DataPoint(
             date=row["date"].strftime("%Y-%m-%d"),
-            value=val
+            value=val,
+            anomaly_value=anomaly_val,
+            ci_lower=ci_lower_dict.get(idx),
+            ci_upper=ci_upper_dict.get(idx)
         ))
 
     # 5. Yearly averages

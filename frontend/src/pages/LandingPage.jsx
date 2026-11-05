@@ -48,7 +48,7 @@ export default function LandingPage() {
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 pt-2">
                 <Link
-                  to="/dashboard"
+                  to="/investigate"
                   className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#00D4FF] to-[#0099FF] text-[#071426] font-bold text-sm sm:text-base flex items-center justify-center gap-2 hover:brightness-110 transition shadow-[0_0_25px_rgba(0,212,255,0.35)] active:scale-95"
                 >
                   <span>Start Exploring</span>
@@ -323,7 +323,7 @@ export default function LandingPage() {
           </p>
           <div className="pt-2">
             <Link
-              to="/dashboard"
+              to="/investigate"
               className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-[#00D4FF] to-[#35D07F] text-[#071426] font-bold text-base hover:brightness-110 transition shadow-[0_0_30px_rgba(0,212,255,0.4)] active:scale-95"
             >
               <span>Launch EarthPulse Dashboard</span>

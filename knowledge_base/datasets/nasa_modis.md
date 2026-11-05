@@ -26,3 +26,6 @@ MODIS is a key instrument aboard the Terra (EOS AM-1) and Aqua (EOS PM-1) satell
 ## Citation
 Didan, K. (2015). MOD13A2 MODIS/Terra Vegetation Indices 16-Day L3 Global 1km SIN Grid V006. NASA EOSDIS Land Processes DAAC. https://doi.org/10.5067/MODIS/MOD13A2.006.
 Wan, Z., et al. (2015). MOD11A2 MODIS/Terra Land Surface Temperature/Emissivity 8-Day L3 Global 1km SIN Grid V006. NASA LP DAAC. https://doi.org/10.5067/MODIS/MOD11A2.006.
+
+---
+**Source Reference:** [https://modis.gsfc.nasa.gov/](https://modis.gsfc.nasa.gov/)

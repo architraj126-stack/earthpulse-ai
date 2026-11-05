@@ -29,3 +29,6 @@ $$\text{CI}_{95\%} = \hat{\beta}_1 \pm t_{n-2, \, 0.975} \cdot SE_{\hat{\beta}_1
 1. **Normality of Residuals**: OLS assumes Gaussian residuals. Environmental variables like precipitation, river discharge, and extreme winds violate this normality assumption.
 2. **Homoscedasticity**: Constant residual variance across the full time period is assumed.
 3. **Absence of Autocorrelation**: Daily and monthly environmental observations frequently exhibit serial correlation (autocorrelation at lag 1). Positive autocorrelation inflates the apparent significance (underestimates standard errors and p-values), necessitating non-parametric verification.
+
+---
+**Source Reference:** [https://www.itl.nist.gov/div898/handbook/pmd/section1/pmd141.htm](https://www.itl.nist.gov/div898/handbook/pmd/section1/pmd141.htm)
