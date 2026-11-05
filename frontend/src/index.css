@@ -67,3 +67,26 @@ body {
 .earth-pulse {
   animation: earthPulse 4s infinite ease-in-out;
 }
+
+/* Accessibility: WCAG 2.1 prefers-reduced-motion standard */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Accessible focus styling */
+:focus-visible {
+  outline: 2px solid #00D4FF !important;
+  outline-offset: 2px !important;
+}
+
+/* Ensure mobile tap targets meet WCAG 2.1 AAA (>=44px) */
+.tap-target-44 {
+  min-height: 44px;
+}

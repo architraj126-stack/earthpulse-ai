@@ -80,6 +80,7 @@ export default function DashboardPage() {
   const [showAdvancedStats, setShowAdvancedStats] = useState(false);
   const [showExplainSection, setShowExplainSection] = useState(true);
   const [secondaryTab, setSecondaryTab] = useState('yearly');
+  const [mobileMapOpen, setMobileMapOpen] = useState(false);
 
   // Load variables and trigger initial analysis
   useEffect(() => {
@@ -276,8 +277,8 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* STEP 2: Where? (Map Workspace) */}
-        <div className="space-y-3 pt-4 border-t border-[#1E3A56]/60">
+        {/* STEP 2: Where? (Map Workspace with 390px Mobile Sheet) */}
+        <div className="space-y-3 pt-4 border-t border-[#1E3A56]/60" role="region" aria-label="Geographic Location Selection">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#00D4FF] text-[#071426] text-xs font-bold font-mono">2</span>
@@ -285,12 +286,33 @@ export default function DashboardPage() {
                 Where? (Drop a pin, explore NASA Satellite, or view Global Atlas)
               </h2>
             </div>
+
+            {/* Mobile Map Drawer Toggle */}
+            <button
+              type="button"
+              onClick={() => setMobileMapOpen(!mobileMapOpen)}
+              className="sm:hidden flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-[#13263A] text-[#00D4FF] border border-[#1E3A56] text-xs font-semibold tap-target-44"
+              aria-expanded={mobileMapOpen}
+              aria-label="Toggle interactive map view on mobile"
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              <span>{mobileMapOpen ? 'Collapse Map' : 'Open Map'}</span>
+              {mobileMapOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+
             <div className="text-xs font-mono text-[#00D4FF] hidden sm:block">
               Coordinates: {latitude.toFixed(2)}°, {longitude.toFixed(2)}°
             </div>
           </div>
 
-          <div className="h-[460px]">
+          {/* Location Summary Pill on Mobile */}
+          <div className="sm:hidden flex items-center justify-between text-xs font-mono text-slate-300 bg-[#13263A] px-3.5 py-2.5 rounded-xl border border-[#1E3A56]">
+            <span className="truncate font-semibold text-white">{locationName}</span>
+            <span className="text-[#00D4FF] shrink-0">[{latitude.toFixed(2)}°, {longitude.toFixed(2)}°]</span>
+          </div>
+
+          {/* Map Container: Collapsible on 390px mobile, fixed 460px on desktop */}
+          <div className={`${mobileMapOpen ? 'block' : 'hidden sm:block'} h-[360px] sm:h-[460px] transition-all`}>
             <MapWorkspace
               locationName={locationName}
               latitude={latitude}
@@ -485,6 +507,7 @@ export default function DashboardPage() {
             variableName={summary.variable_name}
             unit={summary.unit}
             pettitt={summary.pettitt}
+            headline={summary.headline}
             onDownloadCsv={() => {
               window.location.href = getCsvExportUrl({
                 latitude,

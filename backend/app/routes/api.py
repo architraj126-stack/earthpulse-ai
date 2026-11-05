@@ -136,10 +136,15 @@ def analyze_timeseries(req: AnalyzeRequest):
             frequency=req.frequency
         )
 
+        effective_lat = float(meta.get("latitude", req.latitude))
+        effective_lon = float(meta.get("longitude", req.longitude))
+        effective_start = str(meta.get("start_date", req.start_date))
+        effective_end = str(meta.get("end_date", req.end_date))
+
         location_dict = {
             "name": req.location_name,
-            "latitude": req.latitude,
-            "longitude": req.longitude
+            "latitude": effective_lat,
+            "longitude": effective_lon
         }
 
         # 1. Clean and process
@@ -148,8 +153,8 @@ def analyze_timeseries(req: AnalyzeRequest):
             variable=req.variable,
             variable_info=var_info,
             location=location_dict,
-            start_date=req.start_date,
-            end_date=req.end_date,
+            start_date=effective_start,
+            end_date=effective_end,
             frequency=req.frequency,
             source=source_str,
             is_demonstration=is_demo
@@ -160,10 +165,10 @@ def analyze_timeseries(req: AnalyzeRequest):
             df=df,
             variable_info=var_info,
             location_name=req.location_name,
-            latitude=req.latitude,
-            longitude=req.longitude,
-            start_date=req.start_date,
-            end_date=req.end_date,
+            latitude=effective_lat,
+            longitude=effective_lon,
+            start_date=effective_start,
+            end_date=effective_end,
             frequency=req.frequency,
             source=source_str,
             is_demonstration=is_demo,
