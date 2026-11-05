@@ -5,10 +5,48 @@ const API_BASE = '/api';
 
 const api = axios.create({
   baseURL: API_BASE,
+  timeout: 12000,
   headers: {
     'Content-Type': 'application/json'
   }
 });
+
+// In-flight request de-duplication registry
+const pendingRequests = new Map();
+
+api.interceptors.request.use((config) => {
+  const reqKey = `${config.method}:${config.url}:${JSON.stringify(config.params || {})}:${JSON.stringify(config.data || {})}`;
+  config._reqKey = reqKey;
+  return config;
+});
+
+// Exponential backoff retry interceptor for 502/503/504 and network timeouts
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const config = error?.config;
+    if (!config) return Promise.reject(error);
+
+    config.__retryCount = config.__retryCount || 0;
+    const shouldRetry = (
+      config.__retryCount < 2 &&
+      (
+        error.code === 'ECONNABORTED' ||
+        !error.response ||
+        [500, 502, 503, 504].includes(error.response?.status)
+      )
+    );
+
+    if (shouldRetry) {
+      config.__retryCount += 1;
+      const delayMs = 800 * Math.pow(2, config.__retryCount - 1);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      return api(config);
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 export const getHealth = async () => {
   const res = await api.get('/health');
@@ -90,6 +128,16 @@ export const getKnowledgeDoc = async (category, docName) => {
     const res = await api.get(`/knowledge/${category}/${docName}`);
     return res.data;
   }, 30 * 60 * 1000);
+};
+
+export const getDetectiveCases = async () => {
+  try {
+    const res = await api.get('/detective-cases');
+    return res.data;
+  } catch {
+    const fallback = await import('../data/detective_cases.json');
+    return fallback.default || fallback;
+  }
 };
 
 export const getPdfReportUrl = (params) => {

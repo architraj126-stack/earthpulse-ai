@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams, Link } from 'react-router-dom';
 import {
   Search,
   MapPin,
@@ -22,7 +22,12 @@ import {
   CloudRain,
   Droplets,
   Wind,
-  Sun
+  Sun,
+  Share2,
+  Check,
+  RotateCcw,
+  Info,
+  Compass
 } from 'lucide-react';
 import {
   getVariables,
@@ -46,21 +51,26 @@ const VARIABLE_ICONS = {
 
 export default function DashboardPage() {
   const routerLocation = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // Navigation / Preset routing if coming from Atlas
-  const initialVariable = routerLocation.state?.variable || 'T2M';
-  const initialLat = routerLocation.state?.latitude || 12.9716;
-  const initialLon = routerLocation.state?.longitude || 77.5946;
-  const initialLocName = routerLocation.state?.locationName || 'Bengaluru, Karnataka';
+  // Navigation / Preset routing if coming from URL query parameters or Atlas/preset navigation
+  const initialVariable = searchParams.get('var') || routerLocation.state?.variable || 'T2M';
+  const initialLat = searchParams.get('lat') ? parseFloat(searchParams.get('lat')) : (routerLocation.state?.latitude ?? 12.9716);
+  const initialLon = searchParams.get('lon') ? parseFloat(searchParams.get('lon')) : (routerLocation.state?.longitude ?? 77.5946);
+  const initialLocName = searchParams.get('loc') || routerLocation.state?.locationName || 'Bengaluru, Karnataka';
+  const initialStartYear = searchParams.get('start') ? parseInt(searchParams.get('start'), 10) : 1990;
+  const initialEndYear = searchParams.get('end') ? parseInt(searchParams.get('end'), 10) : 2023;
+  const initialFreq = searchParams.get('freq') || 'monthly';
 
   // 3-Step Flow Form State
   const [selectedVariable, setSelectedVariable] = useState(initialVariable);
   const [locationName, setLocationName] = useState(initialLocName);
   const [latitude, setLatitude] = useState(initialLat);
   const [longitude, setLongitude] = useState(initialLon);
-  const [startYear, setStartYear] = useState(1990);
-  const [endYear, setEndYear] = useState(2023);
-  const [frequency, setFrequency] = useState('monthly');
+  const [startYear, setStartYear] = useState(initialStartYear);
+  const [endYear, setEndYear] = useState(initialEndYear);
+  const [frequency, setFrequency] = useState(initialFreq);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // App & Data States
   const [variables, setVariables] = useState([]);
@@ -103,6 +113,17 @@ export default function DashboardPage() {
       frequency: frequency
     };
 
+    // Keep URL query parameters synchronized (shareable read-only URL state)
+    setSearchParams({
+      var: payload.variable,
+      lat: String(payload.latitude),
+      lon: String(payload.longitude),
+      loc: payload.location_name,
+      start: String(startYear),
+      end: String(endYear),
+      freq: frequency
+    }, { replace: true });
+
     try {
       const data = await analyzeTrend(payload);
       setAnalysisResult(data);
@@ -111,6 +132,12 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const copyShareableLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
   };
 
   // Map coordinate callback (updates state WITHOUT triggering analysis)
@@ -145,7 +172,26 @@ export default function DashboardPage() {
         </div>
 
         {summary && (
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={copyShareableLink}
+              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-[#0D1B2A] hover:bg-[#13263A] text-slate-300 border border-[#1E3A56] text-xs font-semibold transition"
+              title="Copy shareable link with current environmental parameters"
+            >
+              {copiedLink ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-400" />
+                  <span className="text-emerald-400">Link Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="w-4 h-4 text-[#00D4FF]" />
+                  <span>Share Analysis</span>
+                </>
+              )}
+            </button>
+
             <a
               href={getPdfReportUrl({
                 latitude,
@@ -352,17 +398,54 @@ export default function DashboardPage() {
 
       </div>
 
-      {/* Error Callout */}
+      {/* Friendly Error Callout with Safe Fallbacks */}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/40 text-red-200 p-4 rounded-2xl flex items-center space-x-3 text-sm">
-          <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
-          <span>{error}</span>
+        <div className="bg-red-500/10 border border-red-500/30 p-5 rounded-3xl space-y-4 shadow-xl">
+          <div className="flex items-start space-x-3.5">
+            <div className="p-2.5 rounded-2xl bg-red-500/20 text-red-400 shrink-0">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-bold text-red-200">Analysis Encountered an Issue</h3>
+              <p className="text-xs text-red-300/90 leading-relaxed">{error}</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 pt-2 pl-0 sm:pl-11">
+            <button
+              type="button"
+              onClick={() => runAnalysis()}
+              className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-bold transition flex items-center space-x-1.5 shadow-lg shadow-red-500/20 active:scale-95"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Retry Analysis</span>
+            </button>
+            <Link
+              to="/cases"
+              className="px-4 py-2 rounded-xl bg-[#0D1B2A] hover:bg-[#13263A] border border-[#1E3A56] text-[#00D4FF] text-xs font-bold transition flex items-center space-x-1.5"
+            >
+              <Compass className="w-3.5 h-3.5" />
+              <span>Explore Verified Detective Cases</span>
+            </Link>
+          </div>
         </div>
       )}
 
       {/* RESULTS PRESENTATION ORDER */}
       {summary && (
         <div className="space-y-6 animate-fade-in">
+
+          {/* Open Ocean Coordinates Advisory */}
+          {summary.is_ocean && (
+            <div className="bg-blue-500/15 border border-blue-500/40 p-4 rounded-2xl flex items-start space-x-3 text-blue-200 text-xs sm:text-sm">
+              <Info className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+              <div>
+                <b className="font-bold">Open Ocean Coordinates ({latitude.toFixed(2)}°, {longitude.toFixed(2)}°):</b>
+                <p className="text-xs text-blue-300/90 mt-1">
+                  Direct ground weather stations are not installed at open sea coordinates. Observations reflect NASA MERRA-2 global atmospheric reanalysis and spaceborne radiometry data.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* 1. Persistent AMBER Banner if Demonstration Data */}
           {summary.is_demonstration && (
