@@ -1,5 +1,6 @@
 import React, { memo, useState, useEffect, useRef, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, Marker, useMap, useMapEvents } from 'react-leaflet';
+import BaseTileLayer from '../../config/mapTiles';
 import L from 'leaflet';
 import { Globe, Filter, AlertCircle, Loader2, Sparkles, MapPin } from 'lucide-react';
 import { getAtlas } from '../../services/api';
@@ -51,7 +52,7 @@ function AtlasCanvasOverlay({
 
       let fillColor;
       if (!cell.is_significant) {
-        fillColor = `rgba(148, 163, 184, 0.25)`; // Muted grey
+        fillColor = `rgba(160, 174, 192, 0.45)`; // Visible muted grey on Esri dark canvas
       } else if (slope > 0) {
         // Diverging Red / Orange
         fillColor = `rgba(239, 68, 68, ${0.35 + norm * 0.55})`;
@@ -251,12 +252,8 @@ export default memo(function GlobalTrendMapView({
           scrollWheelZoom={true}
           className="w-full h-full z-0"
         >
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-            maxZoom={19}
-            subdomains="abcd"
-          />
+          {/* Shared Resilient Dark Basemap (Esri with OSM fallback) */}
+          <BaseTileLayer />
 
           {atlasData?.cells && (
             <AtlasCanvasOverlay

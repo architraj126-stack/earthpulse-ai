@@ -22,7 +22,8 @@ import {
   Tooltip,
   Legend
 } from 'recharts';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, Marker, Popup } from 'react-leaflet';
+import BaseTileLayer from '../config/mapTiles';
 import L from 'leaflet';
 import { getVariables, compareRegions } from '../services/api';
 
@@ -319,15 +320,12 @@ export default function ComparePage() {
           center={[(latA + latB) / 2, (lonA + lonB) / 2]}
           zoom={3}
           minZoom={2}
+          maxZoom={16}
           scrollWheelZoom={false}
           className="w-full h-full z-0"
         >
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-            maxZoom={19}
-            subdomains="abcd"
-          />
+          {/* Shared Resilient Dark Basemap (Esri with OSM fallback) */}
+          <BaseTileLayer />
           <Marker position={[latA, lonA]} icon={pinIconA}>
             <Popup><b className="text-cyan-700">Region A: {nameA}</b></Popup>
           </Marker>

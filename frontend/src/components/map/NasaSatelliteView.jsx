@@ -1,5 +1,6 @@
 import React, { memo, useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import BaseTileLayer from '../../config/mapTiles';
 import L from 'leaflet';
 import { Calendar, Layers, Sliders, MapPin, Info, AlertCircle } from 'lucide-react';
 
@@ -151,13 +152,8 @@ export default memo(function NasaSatelliteView({
           scrollWheelZoom={true}
           className="w-full h-full z-0"
         >
-          {/* Base Dark Map */}
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-            maxZoom={19}
-            subdomains="abcd"
-          />
+          {/* Shared Resilient Dark Basemap (Esri with OSM fallback) */}
+          <BaseTileLayer />
 
           {/* NASA GIBS WMTS Satellite Layer */}
           <TileLayer

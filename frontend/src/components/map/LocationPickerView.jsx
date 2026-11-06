@@ -1,5 +1,6 @@
 import React, { memo, useState, useCallback, useRef, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import { MapContainer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import BaseTileLayer from '../../config/mapTiles';
 import L from 'leaflet';
 import { Search, MapPin, Compass, Loader2 } from 'lucide-react';
 
@@ -213,13 +214,8 @@ export default memo(function LocationPickerView({
           scrollWheelZoom={true}
           className="w-full h-full z-0"
         >
-          {/* CartoDB Dark Matter Basemap */}
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-            maxZoom={19}
-            subdomains="abcd"
-          />
+          {/* Shared Resilient Dark Basemap (Esri with OSM fallback) */}
+          <BaseTileLayer />
           <ClickHandler onPinDrop={handlePinDrop} />
           <RecenterMap center={[latitude, longitude]} />
           <Marker position={[latitude, longitude]} icon={locationIcon} />
