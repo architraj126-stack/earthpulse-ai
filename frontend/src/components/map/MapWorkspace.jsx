@@ -77,7 +77,7 @@ export default memo(function MapWorkspace({
       </div>
 
       {/* Tab View Container */}
-      <div className="flex-1 min-h-[420px]">
+      <div className="flex-1 min-h-0 flex flex-col">
         {activeTab === 'picker' && (
           <LocationPickerView
             selectedLocation={selectedLocation}

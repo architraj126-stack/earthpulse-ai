@@ -203,7 +203,7 @@ export default memo(function LocationPickerView({
       </div>
 
       {/* Clean Leaflet Map Container */}
-      <div className="flex-1 w-full min-h-[360px] rounded-xl overflow-hidden border border-[#1E3A56] relative">
+      <div className="flex-1 w-full min-h-[420px] rounded-xl overflow-hidden border border-[#1E3A56] relative">
         <MapContainer
           key="earthpulse-location-picker-map"
           center={[latitude, longitude]}

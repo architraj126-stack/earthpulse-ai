@@ -226,7 +226,8 @@ class AtlasResponse(BaseModel):
     period: Optional[str] = "1990-2023"
     start_year: Optional[int] = 1990
     end_year: Optional[int] = 2023
-    source: Optional[str] = "NASA POWER MERRA-2 Climatological Reanalysis"
+    source: Optional[str] = "Illustrative simulated grid (not observed data)"
+    is_simulated: Optional[bool] = None
     grid_resolution_deg: float = 5.0
     total_cells: Optional[int] = None
     cell_count: Optional[int] = None

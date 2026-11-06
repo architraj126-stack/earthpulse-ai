@@ -1,7 +1,7 @@
 import React, { memo, useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { Calendar, Layers, Sliders, MapPin, Info } from 'lucide-react';
+import { Calendar, Layers, Sliders, MapPin, Info, AlertCircle } from 'lucide-react';
 
 const satellitePinIcon = L.divIcon({
   className: 'earthpulse-satellite-pin',
@@ -62,7 +62,7 @@ const GIBS_LAYERS = [
 ];
 
 // Helper: default to yesterday YYYY-MM-DD
-function getYesterdayDateStr() {
+function getLatestAvailableDateStr() {
   const d = new Date();
   d.setDate(d.getDate() - 2); // 2 days ago for reliable complete global coverage
   return d.toISOString().split('T')[0];
@@ -73,8 +73,13 @@ export default memo(function NasaSatelliteView({
   onLocationChange
 }) {
   const [selectedLayer, setSelectedLayer] = useState(GIBS_LAYERS[0].id);
-  const [satelliteDate, setSatelliteDate] = useState(getYesterdayDateStr());
+  const [satelliteDate, setSatelliteDate] = useState(getLatestAvailableDateStr());
   const [opacity, setOpacity] = useState(0.85);
+  const [tileErrorCount, setTileErrorCount] = useState(0);
+
+  useEffect(() => {
+    setTileErrorCount(0);
+  }, [selectedLayer, satelliteDate]);
 
   const { latitude, longitude, name } = selectedLocation;
 
@@ -111,7 +116,7 @@ export default memo(function NasaSatelliteView({
           <input
             type="date"
             value={satelliteDate}
-            max={getYesterdayDateStr()}
+            max={getLatestAvailableDateStr()}
             onChange={(e) => setSatelliteDate(e.target.value)}
             className="flex-1 bg-[#13263A] border border-[#1E3A56] rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-[#00D4FF]"
           />
@@ -136,9 +141,9 @@ export default memo(function NasaSatelliteView({
       </div>
 
       {/* Map Container */}
-      <div className="flex-1 w-full min-h-[360px] rounded-xl overflow-hidden border border-[#1E3A56] relative">
+      <div className="flex-1 w-full min-h-[420px] rounded-xl overflow-hidden border border-[#1E3A56] relative">
         <MapContainer
-          key={`nasa-satellite-map-${selectedLayer}-${satelliteDate}`}
+          key="earthpulse-nasa-satellite-map"
           center={[latitude, longitude]}
           zoom={3}
           minZoom={2}
@@ -156,13 +161,16 @@ export default memo(function NasaSatelliteView({
 
           {/* NASA GIBS WMTS Satellite Layer */}
           <TileLayer
-            key={`${gibsTileUrl}-${opacity}`}
+            key={gibsTileUrl}
             url={gibsTileUrl}
             attribution='Imagery &copy; <a href="https://earthdata.nasa.gov/gibs">NASA EOSDIS GIBS</a>'
             opacity={opacity}
             maxZoom={9}
             subdomains={['a', 'b', 'c']}
             noWrap={true}
+            eventHandlers={{
+              tileerror: () => setTileErrorCount((c) => c + 1)
+            }}
           />
 
           <SatelliteClickHandler onPinDrop={handleSatelliteClick} />
@@ -176,6 +184,13 @@ export default memo(function NasaSatelliteView({
           <span className="font-semibold text-white">NASA GIBS WMTS Live</span>
           <span className="text-slate-400 font-mono">({satelliteDate})</span>
         </div>
+
+        {tileErrorCount >= 4 && (
+          <div className="absolute top-12 right-2.5 z-[1000] bg-amber-950/90 border border-amber-600/50 px-3 py-1.5 rounded-lg text-xs text-amber-200 flex items-center space-x-1.5 shadow-lg">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>Imagery unavailable for this date</span>
+          </div>
+        )}
 
         {/* Bottom Location Indicator */}
         <div className="absolute bottom-2.5 left-2.5 z-[1000] bg-[#071426]/90 border border-[#1E3A56] px-3 py-1 rounded-lg text-[11px] text-slate-300 flex items-center space-x-1.5 pointer-events-none">

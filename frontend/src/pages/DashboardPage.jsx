@@ -312,7 +312,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Map Container: Collapsible on 390px mobile, fixed 460px on desktop */}
-          <div className={`${mobileMapOpen ? 'block' : 'hidden sm:block'} h-[360px] sm:h-[460px] transition-all`}>
+          <div className={`${mobileMapOpen ? 'block' : 'hidden sm:block'} h-[600px] sm:h-[640px] transition-all`}>
             <MapWorkspace
               locationName={locationName}
               latitude={latitude}

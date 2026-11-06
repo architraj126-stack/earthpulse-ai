@@ -148,32 +148,34 @@ export default memo(function GlobalTrendMapView({
 
   const { latitude, longitude, name } = selectedLocation;
 
-  useEffect(() => {
-    let isCancelled = false;
-    async function loadAtlas() {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const data = await getAtlas(atlasVar);
-        if (!isCancelled) {
-          setAtlasData(data);
-        }
-      } catch (err) {
-        if (!isCancelled) {
-          setError(err?.response?.data?.detail || 'Atlas not built yet. Run build_atlas.py to precompute data.');
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsLoading(false);
-        }
+  const loadAtlas = useCallback(async (bypassCache = false) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await getAtlas(atlasVar, bypassCache);
+      setAtlasData(data);
+    } catch (err) {
+      if (err.response?.status === 404) {
+        setError('Atlas data for this variable has not been built.');
+      } else if (
+        !err.response ||
+        err.code === 'ERR_NETWORK' ||
+        err.code === 'ECONNABORTED' ||
+        [502, 503, 504].includes(err.response?.status) ||
+        (err.response?.status === 500 && !err.response?.data?.detail)
+      ) {
+        setError('Cannot reach the EarthPulse backend. Is it running on port 8000?');
+      } else {
+        setError(err.response?.data?.detail || err.message || 'Failed to load Atlas data.');
       }
+    } finally {
+      setIsLoading(false);
     }
-
-    loadAtlas();
-    return () => {
-      isCancelled = true;
-    };
   }, [atlasVar]);
+
+  useEffect(() => {
+    loadAtlas(false);
+  }, [loadAtlas]);
 
   const handleCellSelect = (cell) => {
     const locName = cell.location_name || `Grid Cell (${cell.latitude}°, ${cell.longitude}°)`;
@@ -184,12 +186,19 @@ export default memo(function GlobalTrendMapView({
     <div className="flex flex-col h-full space-y-3">
       {/* Top Header & Variable Switcher */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-[#0D1B2A] p-2.5 rounded-xl border border-[#1E3A56] text-xs">
-        <div className="flex items-center space-x-2">
-          <Globe className="w-4 h-4 text-[#00D4FF] shrink-0" />
-          <span className="font-semibold text-white">Global Trend Atlas (1990–2023)</span>
-          <span className="text-slate-400 font-mono">
-            {atlasData ? `(${atlasData.cell_count || atlasData.cells?.length || 0} cells)` : ''}
-          </span>
+        <div className="flex items-center flex-wrap gap-2">
+          <div className="flex items-center space-x-2">
+            <Globe className="w-4 h-4 text-[#00D4FF] shrink-0" />
+            <span className="font-semibold text-white">Illustrative Global Trend Atlas (simulated)</span>
+            <span className="text-slate-400 font-mono">
+              {atlasData ? `(${atlasData.cell_count || atlasData.cells?.length || 0} cells)` : ''}
+            </span>
+          </div>
+          {(atlasData?.is_simulated ?? true) && (
+            <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-semibold">
+              Simulated demo data
+            </span>
+          )}
         </div>
 
         {/* Variable Switcher */}
@@ -210,7 +219,7 @@ export default memo(function GlobalTrendMapView({
       </div>
 
       {/* Map Container */}
-      <div className="flex-1 w-full min-h-[360px] rounded-xl overflow-hidden border border-[#1E3A56] relative">
+      <div className="flex-1 w-full min-h-[420px] rounded-xl overflow-hidden border border-[#1E3A56] relative">
         {isLoading && (
           <div className="absolute inset-0 z-[1000] bg-[#071426]/75 flex flex-col items-center justify-center space-y-2">
             <Loader2 className="w-8 h-8 text-[#00D4FF] animate-spin" />
@@ -221,8 +230,15 @@ export default memo(function GlobalTrendMapView({
         {error && (
           <div className="absolute inset-0 z-[1000] bg-[#071426]/90 flex flex-col items-center justify-center p-6 text-center space-y-3">
             <AlertCircle className="w-10 h-10 text-amber-400" />
-            <h4 className="text-base font-semibold text-white">Atlas Dataset Not Found</h4>
-            <p className="text-xs text-slate-400 max-w-md">{error}</p>
+            <h4 className="text-base font-semibold text-white">Unable to Load Atlas</h4>
+            <p className="text-xs text-slate-300 max-w-md font-mono">{error}</p>
+            <button
+              type="button"
+              onClick={() => loadAtlas(true)}
+              className="mt-2 px-4 py-1.5 bg-[#00D4FF] hover:bg-[#00D4FF]/80 text-[#071426] font-bold text-xs rounded-xl shadow-lg transition flex items-center space-x-1.5"
+            >
+              <span>Retry</span>
+            </button>
           </div>
         )}
 

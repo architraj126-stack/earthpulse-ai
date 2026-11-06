@@ -34,14 +34,12 @@ body {
 .leaflet-container {
   width: 100%;
   height: 100%;
+  min-height: 420px;
   border-radius: 0.75rem;
   background-color: #0D1B2A !important;
   z-index: 10;
 }
 
-.leaflet-tile {
-  filter: brightness(0.7) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
-}
 
 .leaflet-popup-content-wrapper {
   background: #13263A !important;

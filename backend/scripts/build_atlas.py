@@ -214,6 +214,8 @@ def generate_atlas_for_variable(var_code: str, var_meta: dict) -> dict:
         "end_year": end_year,
         "grid_resolution_deg": grid_res,
         "cell_count": len(cells),
+        "is_simulated": True,
+        "source": "Illustrative simulated grid (not observed data)",
         "cells": cells
     }
 

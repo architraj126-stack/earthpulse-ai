@@ -13229,5 +13229,7 @@
       "trend_direction": "increasing",
       "mean_value": 1.8
     }
-  ]
+  ],
+  "is_simulated": true,
+  "source": "Illustrative simulated grid (not observed data)"
 }

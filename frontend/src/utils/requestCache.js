@@ -62,6 +62,15 @@ class RequestCache {
     return promise;
   }
 
+  delete(key) {
+    this.cache.delete(key);
+    this.inFlight.delete(key);
+  }
+
+  invalidate(key) {
+    this.delete(key);
+  }
+
   clear() {
     this.cache.clear();
     this.inFlight.clear();

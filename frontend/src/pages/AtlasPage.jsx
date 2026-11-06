@@ -52,9 +52,16 @@ export default function AtlasPage() {
       {/* Title & Introduction */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-[#0D1B2A] border border-[#1E3A56] p-6 rounded-2xl shadow-xl">
         <div className="space-y-1">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-[#00D4FF]/10 text-[#00D4FF] border border-[#00D4FF]/30 text-xs font-semibold">
-            <Globe className="w-3.5 h-3.5" />
-            <span>Planetary Climate Reanalysis (1990–2023)</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-[#00D4FF]/10 text-[#00D4FF] border border-[#00D4FF]/30 text-xs font-semibold">
+              <Globe className="w-3.5 h-3.5" />
+              <span>Illustrative Global Trend Atlas (simulated)</span>
+            </div>
+            {(atlasMeta?.is_simulated ?? true) && (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-semibold">
+                Simulated demo data
+              </span>
+            )}
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-heading">
             World Trend Atlas
@@ -86,7 +93,7 @@ export default function AtlasPage() {
       </div>
 
       {/* Main Map Component */}
-      <div className="h-[520px]">
+      <div className="h-[600px] sm:h-[640px]">
         <GlobalTrendMapView
           selectedLocation={selectedLocation}
           onLocationChange={(name, lat, lon) => setSelectedLocation({ name, latitude: lat, longitude: lon })}

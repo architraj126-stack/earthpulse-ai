@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { appRequestCache } from '../utils/requestCache';
 
-const API_BASE = '/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -33,7 +33,7 @@ api.interceptors.response.use(
       (
         error.code === 'ECONNABORTED' ||
         !error.response ||
-        [500, 502, 503, 504].includes(error.response?.status)
+        [502, 503, 504].includes(error.response?.status)
       )
     );
 
@@ -85,8 +85,11 @@ export const compareRegions = async (payload) => {
   }, 10 * 60 * 1000);
 };
 
-export const getAtlas = async (variable = 'T2M') => {
+export const getAtlas = async (variable = 'T2M', bypassCache = false) => {
   const cacheKey = `atlas:${variable}`;
+  if (bypassCache) {
+    appRequestCache.invalidate(cacheKey);
+  }
   return appRequestCache.fetchWithCache(cacheKey, async () => {
     const res = await api.get('/atlas', { params: { variable } });
     return res.data;
@@ -142,12 +145,12 @@ export const getDetectiveCases = async () => {
 
 export const getPdfReportUrl = (params) => {
   const searchParams = new URLSearchParams(params);
-  return `/api/report?${searchParams.toString()}`;
+  return `${API_BASE}/report?${searchParams.toString()}`;
 };
 
 export const getCsvExportUrl = (params) => {
   const searchParams = new URLSearchParams(params);
-  return `/api/export/csv?${searchParams.toString()}`;
+  return `${API_BASE}/export/csv?${searchParams.toString()}`;
 };
 
 export default api;
