@@ -12,7 +12,7 @@ import os
 import re
 from pathlib import Path
 
-KB_DIR = Path("knowledge_base")
+KB_DIR = Path(__file__).resolve().parent.parent / "knowledge_base"
 CHANGES_LOG = []
 
 SOURCE_URLS = {

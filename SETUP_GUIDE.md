@@ -65,7 +65,31 @@ npm run preview
 
 ---
 
-## 5. Live Hackathon Demonstration Script
+## 5. Deploying to Vercel
+
+EarthPulse AI is configured as a multi-service Vercel project via `vercel.json` deploying both the Vite React frontend and the FastAPI backend.
+
+1. **Push the repository** to GitHub.
+2. **Import the project** in the [Vercel Dashboard](https://vercel.com/new).
+3. If prompted for Framework Preset, select **Services** (or let `vercel.json` declare the services automatically).
+4. In **Project Settings -> Environment Variables**, add:
+   - `ENVIRONMENT=production` (ensures restrictive production CORS is enforced instead of wildcard `*`).
+5. **Deploy**.
+6. **Verify the Deployment**:
+   - Frontend Home: `https://<your-project>.vercel.app/`
+   - Investigate Page: `https://<your-project>.vercel.app/investigate`
+   - World Trend Atlas: `https://<your-project>.vercel.app/atlas`
+   - Backend Health Check: `https://<your-project>.vercel.app/api/health`
+   - Backend Atlas Endpoint: `https://<your-project>.vercel.app/api/atlas?variable=T2M`
+
+> **Note on Storage**: On Vercel's serverless environment, `/tmp` storage is ephemeral. SQLite database storage (analysis history and local NASA API response cache) does not persist across container restarts or instances.
+
+---
+
+
+---
+
+## 6. Live Hackathon Demonstration Script
 
 Follow these steps to demonstrate the platform to judges and audiences:
 

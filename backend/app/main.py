@@ -16,8 +16,11 @@ logger = logging.getLogger("earthpulse")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Initializing EarthPulse AI SQLite database...")
-    init_db()
-    logger.info("Database initialized successfully.")
+    try:
+        init_db()
+        logger.info("Database initialized successfully.")
+    except Exception as e:
+        logger.exception("Database initialization error during startup: %s", e)
     yield
 
 app = FastAPI(

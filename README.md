@@ -79,7 +79,7 @@ flowchart TD
     end
 
     subgraph Grounded_AI ["Knowledge & RAG Engine"]
-        KB[("28 Curated Climate Papers & Docs<br/>(knowledge_base/)")]
+        KB[("28 Curated Climate Papers & Docs<br/>(backend/knowledge_base/)")]
         BM25["BM25 Lexical Ranking Index"]
         Validator["Grounding Regex Validator<br/>(Anti-Hallucination Guard)"]
         KB --> BM25
@@ -190,7 +190,7 @@ earthpulse-ai/
 │       ├── two_minute_demo_script.md      # Second-by-second judge presentation script
 │       ├── three_minute_video_outline.md  # Video submission visual storyboard & audio cues
 │       └── five_slide_pitch_outline.md    # 5-Slide deck content and speaker notes
-├── knowledge_base/                        # 28 Curated summaries of NASA, NOAA, WMO & IPCC publications
+├── backend/knowledge_base/                        # 28 Curated summaries of NASA, NOAA, WMO & IPCC publications
 ├── DATA_SOURCES.md                        # Satellite & atmospheric model documentation
 ├── STATISTICAL_METHODS.md                 # Derivations and formulas for non-parametric tests
 ├── SETUP_GUIDE.md                         # Detailed developer onboarding guide

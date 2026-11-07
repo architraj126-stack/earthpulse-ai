@@ -1,13 +1,13 @@
 # EarthPulse AI — Scientific Knowledge Base Architecture
 
-EarthPulse AI incorporates an embedded, verified scientific knowledge base (`knowledge_base/`) containing 28 structured research articles and reference documents. This ensures the platform's AI Assistant ("Ask EarthPulse AI") grounds all explanations, answers, and interpretations in curated summaries of NASA, NOAA, WMO and IPCC documentation rather than hallucinating facts.
+EarthPulse AI incorporates an embedded, verified scientific knowledge base (`backend/knowledge_base/`) containing 28 structured research articles and reference documents. This ensures the platform's AI Assistant ("Ask EarthPulse AI") grounds all explanations, answers, and interpretations in curated summaries of NASA, NOAA, WMO and IPCC documentation rather than hallucinating facts.
 
 ---
 
 ## 1. Directory Structure & Document Taxonomy
 
 ```
-knowledge_base/
+backend/knowledge_base/
 ├── datasets/                       # Satellite missions and assimilation systems
 │   ├── nasa_power.md              # NASA POWER technical architecture & endpoints
 │   ├── nasa_modis.md              # MODIS NDVI, EVI, Land Surface Temperature
@@ -65,6 +65,6 @@ When a user submits a query to the AI Data Detective:
 ## 3. Extending the Knowledge Base
 
 To add a new dataset, research paper, or variable:
-1. Create a standard Markdown document in the appropriate subfolder (`knowledge_base/{category}/{name}.md`).
+1. Create a standard Markdown document in the appropriate subfolder (`backend/knowledge_base/{category}/{name}.md`).
 2. Include a top-level `# Title`, overview, formulas, and citations.
 3. The backend `KnowledgeBaseIndex` automatically indexes the new file upon startup.

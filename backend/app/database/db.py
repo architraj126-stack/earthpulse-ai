@@ -1,10 +1,17 @@
 import sqlite3
 import json
 import os
+import tempfile
+import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "earthpulse.db")
+logger = logging.getLogger("earthpulse.db")
+
+if os.getenv("VERCEL"):
+    DB_PATH = os.path.join(tempfile.gettempdir(), "earthpulse.db")
+else:
+    DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "earthpulse.db")
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
@@ -12,45 +19,48 @@ def get_connection():
     return conn
 
 def init_db():
-    conn = get_connection()
-    cursor = conn.cursor()
-    
-    # Analysis History Table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS analysis_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        created_at TEXT NOT NULL,
-        variable TEXT NOT NULL,
-        variable_name TEXT NOT NULL,
-        location_name TEXT NOT NULL,
-        latitude REAL NOT NULL,
-        longitude REAL NOT NULL,
-        start_date TEXT NOT NULL,
-        end_date TEXT NOT NULL,
-        temporal_resolution TEXT NOT NULL,
-        linear_slope REAL,
-        sen_slope REAL,
-        p_value REAL,
-        r_squared REAL,
-        trend_direction TEXT,
-        is_significant INTEGER,
-        observation_count INTEGER,
-        summary TEXT
-    )
-    """)
-    
-    # NASA API Cache Table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS nasa_cache (
-        cache_key TEXT PRIMARY KEY,
-        url TEXT,
-        data_json TEXT NOT NULL,
-        cached_at TEXT NOT NULL
-    )
-    """)
-    
-    conn.commit()
-    conn.close()
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Analysis History Table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS analysis_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT NOT NULL,
+            variable TEXT NOT NULL,
+            variable_name TEXT NOT NULL,
+            location_name TEXT NOT NULL,
+            latitude REAL NOT NULL,
+            longitude REAL NOT NULL,
+            start_date TEXT NOT NULL,
+            end_date TEXT NOT NULL,
+            temporal_resolution TEXT NOT NULL,
+            linear_slope REAL,
+            sen_slope REAL,
+            p_value REAL,
+            r_squared REAL,
+            trend_direction TEXT,
+            is_significant INTEGER,
+            observation_count INTEGER,
+            summary TEXT
+        )
+        """)
+        
+        # NASA API Cache Table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS nasa_cache (
+            cache_key TEXT PRIMARY KEY,
+            url TEXT,
+            data_json TEXT NOT NULL,
+            cached_at TEXT NOT NULL
+        )
+        """)
+        
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.exception("Failed to initialize database: %s", e)
 
 def save_analysis(
     variable: str,

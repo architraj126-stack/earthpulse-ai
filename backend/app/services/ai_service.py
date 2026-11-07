@@ -11,11 +11,13 @@ from app.schemas.models import AskQuestionResponse
 CURRENT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = CURRENT_DIR.parent.parent.parent
 KB_CANDIDATES = [
-    PROJECT_ROOT / "knowledge_base",
     CURRENT_DIR.parent.parent / "knowledge_base",
+    PROJECT_ROOT / "backend" / "knowledge_base",
+    PROJECT_ROOT / "knowledge_base",
+    Path("backend/knowledge_base").resolve(),
     Path("knowledge_base").resolve()
 ]
-KB_BASE_DIR = next((p for p in KB_CANDIDATES if p.exists()), Path("knowledge_base").resolve())
+KB_BASE_DIR = next((p for p in KB_CANDIDATES if p.exists()), (CURRENT_DIR.parent.parent / "knowledge_base").resolve())
 PROMPT_PATH = CURRENT_DIR.parent / "prompts" / "earthpulse_system.md"
 ATLAS_DIR = CURRENT_DIR.parent.parent / "data" / "atlas"
 
