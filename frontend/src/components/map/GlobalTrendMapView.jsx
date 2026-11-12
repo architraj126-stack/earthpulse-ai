@@ -9,8 +9,8 @@ const atlasPinIcon = L.divIcon({
   className: 'earthpulse-atlas-pin',
   html: `
     <div style="position: relative; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; transform: translateY(-10px);">
-      <div style="width: 22px; height: 22px; border-radius: 50%; background: rgba(0, 212, 255, 0.4); border: 2px solid #FFFFFF; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(0, 212, 255, 0.8);">
-        <div style="width: 8px; height: 8px; border-radius: 50%; background: #00D4FF;"></div>
+      <div style="width: 22px; height: 22px; border-radius: 50%; background: rgba(217, 182, 76, 0.4); border: 2px solid #FFFFFF; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(217, 182, 76, 0.8);">
+        <div style="width: 8px; height: 8px; border-radius: 50%; background: #d9b64c;"></div>
       </div>
     </div>
   `,
@@ -55,10 +55,10 @@ function AtlasCanvasOverlay({
         fillColor = `rgba(160, 174, 192, 0.45)`; // Visible muted grey on Esri dark canvas
       } else if (slope > 0) {
         // Diverging Red / Orange
-        fillColor = `rgba(239, 68, 68, ${0.35 + norm * 0.55})`;
+        fillColor = `rgba(232, 100, 58, ${0.35 + norm * 0.55})`;
       } else {
         // Diverging Blue / Cyan
-        fillColor = `rgba(0, 212, 255, ${0.35 + norm * 0.55})`;
+        fillColor = `rgba(217, 182, 76, ${0.35 + norm * 0.55})`;
       }
 
       const radius = Math.max(4, Math.min(16, 5 * (map.getZoom() / 3)));
@@ -186,10 +186,10 @@ export default memo(function GlobalTrendMapView({
   return (
     <div className="flex flex-col h-full space-y-3">
       {/* Top Header & Variable Switcher */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-[#0D1B2A] p-2.5 rounded-xl border border-[#1E3A56] text-xs">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-[var(--panel)] p-2.5 rounded-xl border border-[var(--border)] text-xs">
         <div className="flex items-center flex-wrap gap-2">
           <div className="flex items-center space-x-2">
-            <Globe className="w-4 h-4 text-[#00D4FF] shrink-0" />
+            <Globe className="w-4 h-4 text-[var(--accent)] shrink-0" />
             <span className="font-semibold text-white">Illustrative Global Trend Atlas (simulated)</span>
             <span className="text-slate-400 font-mono">
               {atlasData ? `(${atlasData.cell_count || atlasData.cells?.length || 0} cells)` : ''}
@@ -208,7 +208,7 @@ export default memo(function GlobalTrendMapView({
           <select
             value={atlasVar}
             onChange={(e) => setAtlasVar(e.target.value)}
-            className="bg-[#13263A] border border-[#1E3A56] rounded-lg px-2.5 py-1 text-white focus:outline-none focus:border-[#00D4FF]"
+            className="bg-[var(--card)] border border-[var(--border)] rounded-lg px-2.5 py-1 text-white focus:outline-none focus:border-[var(--accent)]"
           >
             {SUPPORTED_VARIABLES.map((v) => (
               <option key={v.code} value={v.code}>
@@ -220,23 +220,23 @@ export default memo(function GlobalTrendMapView({
       </div>
 
       {/* Map Container */}
-      <div className="flex-1 w-full min-h-[420px] rounded-xl overflow-hidden border border-[#1E3A56] relative">
+      <div className="flex-1 w-full min-h-[420px] rounded-xl overflow-hidden border border-[var(--border)] relative">
         {isLoading && (
-          <div className="absolute inset-0 z-[1000] bg-[#071426]/75 flex flex-col items-center justify-center space-y-2">
-            <Loader2 className="w-8 h-8 text-[#00D4FF] animate-spin" />
+          <div className="absolute inset-0 z-[1000] bg-[var(--bg)]/75 flex flex-col items-center justify-center space-y-2">
+            <Loader2 className="w-8 h-8 text-[var(--accent)] animate-spin" />
             <span className="text-sm text-slate-300 font-medium">Loading 5° Global Trend Atlas...</span>
           </div>
         )}
 
         {error && (
-          <div className="absolute inset-0 z-[1000] bg-[#071426]/90 flex flex-col items-center justify-center p-6 text-center space-y-3">
+          <div className="absolute inset-0 z-[1000] bg-[var(--bg)]/90 flex flex-col items-center justify-center p-6 text-center space-y-3">
             <AlertCircle className="w-10 h-10 text-amber-400" />
             <h4 className="text-base font-semibold text-white">Unable to Load Atlas</h4>
             <p className="text-xs text-slate-300 max-w-md font-mono">{error}</p>
             <button
               type="button"
               onClick={() => loadAtlas(true)}
-              className="mt-2 px-4 py-1.5 bg-[#00D4FF] hover:bg-[#00D4FF]/80 text-[#071426] font-bold text-xs rounded-xl shadow-lg transition flex items-center space-x-1.5"
+              className="mt-2 px-4 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent)]/80 text-[var(--accent-fg)] font-bold text-xs rounded-xl shadow-lg transition flex items-center space-x-1.5"
             >
               <span>Retry</span>
             </button>
@@ -269,13 +269,13 @@ export default memo(function GlobalTrendMapView({
         </MapContainer>
 
         {/* Diverging Colormap Legend */}
-        <div className="absolute bottom-3 right-3 z-[1000] bg-[#071426]/95 border border-[#1E3A56] p-3 rounded-xl text-xs space-y-1.5 shadow-xl max-w-[260px]">
+        <div className="absolute bottom-3 right-3 z-[1000] bg-[var(--bg)]/95 border border-[var(--border)] p-3 rounded-xl text-xs space-y-1.5 shadow-xl max-w-[260px]">
           <div className="font-semibold text-white flex items-center justify-between">
             <span>Sen's Slope per Decade</span>
-            <span className="text-[#00D4FF] font-mono">{atlasData?.unit || '°C'}/dec</span>
+            <span className="text-[var(--accent)] font-mono">{atlasData?.unit || '°C'}/dec</span>
           </div>
 
-          <div className="h-3 w-full rounded-full bg-gradient-to-r from-[#00D4FF] via-slate-500 to-[#EF4444]" />
+          <div className="h-3 w-full rounded-full bg-gradient-to-r from-[#d9b64c] via-slate-500 to-[#e8643a]" />
 
           <div className="flex justify-between text-[10px] text-slate-400 font-mono">
             <span>Negative (Cooling/Drying)</span>
@@ -283,17 +283,17 @@ export default memo(function GlobalTrendMapView({
             <span>Positive (Warming/Wetting)</span>
           </div>
 
-          <div className="flex items-center space-x-2 pt-1 border-t border-[#1E3A56]/60 text-[11px] text-slate-300">
+          <div className="flex items-center space-x-2 pt-1 border-t border-[var(--border)]/60 text-[11px] text-slate-300">
             <div className="w-2 h-2 rounded-full bg-white border border-slate-900 shrink-0"></div>
             <span>White dot: Statistically Significant (p &lt; 0.05)</span>
           </div>
         </div>
 
         {/* Selected Location Pill */}
-        <div className="absolute top-3 left-3 z-[1000] bg-[#071426]/95 border border-[#1E3A56] px-3 py-1.5 rounded-xl text-xs flex items-center space-x-2 text-slate-300">
-          <MapPin className="w-3.5 h-3.5 text-[#00D4FF]" />
+        <div className="absolute top-3 left-3 z-[1000] bg-[var(--bg)]/95 border border-[var(--border)] px-3 py-1.5 rounded-xl text-xs flex items-center space-x-2 text-slate-300">
+          <MapPin className="w-3.5 h-3.5 text-[var(--accent)]" />
           <span className="truncate max-w-[180px] font-medium text-white">{name}</span>
-          <span className="text-[#00D4FF] font-mono">({latitude.toFixed(2)}°, {longitude.toFixed(2)}°)</span>
+          <span className="text-[var(--accent)] font-mono">({latitude.toFixed(2)}°, {longitude.toFixed(2)}°)</span>
         </div>
       </div>
     </div>

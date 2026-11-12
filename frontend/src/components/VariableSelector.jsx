@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Search, Thermometer, CloudRain, Droplets, Wind, Sun, Info, Check, Filter } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Search, Thermometer, CloudRain, Droplets, Wind, Sun, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { useTheme } from '../theme/ThemeContext';
 
 const VARIABLE_ICONS = {
   T2M: Thermometer,
@@ -9,132 +10,173 @@ const VARIABLE_ICONS = {
   ALLSKY_SFC_SW_DWN: Sun
 };
 
-const VARIABLE_ACCENTS = {
-  T2M: 'text-amber-400 bg-amber-400/10 border-amber-400/30',
-  PRECTOTCORR: 'text-blue-400 bg-blue-400/10 border-blue-400/30',
-  RH2M: 'text-cyan-400 bg-cyan-400/10 border-cyan-400/30',
-  WS2M: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30',
-  ALLSKY_SFC_SW_DWN: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/30'
+const DOMAIN_MAPPING = {
+  All: ['T2M', 'PRECTOTCORR', 'RH2M', 'WS2M', 'ALLSKY_SFC_SW_DWN'],
+  Atmosphere: ['T2M', 'PRECTOTCORR', 'RH2M', 'WS2M', 'ALLSKY_SFC_SW_DWN'],
+  Land: ['T2M', 'PRECTOTCORR', 'RH2M', 'ALLSKY_SFC_SW_DWN'],
+  Ocean: ['T2M', 'PRECTOTCORR', 'WS2M'],
+  Cryosphere: ['T2M', 'ALLSKY_SFC_SW_DWN']
 };
+
+const DEFAULT_SPARKLINES = {
+  T2M: { points: [0.1, 0.2, 0.15, 0.35, 0.42, 0.55, 0.68, 0.85], slope: 0.32 },
+  PRECTOTCORR: { points: [0.4, 0.52, 0.38, 0.45, 0.5, 0.41, 0.48, 0.54], slope: 0.04 },
+  RH2M: { points: [0.7, 0.65, 0.62, 0.58, 0.6, 0.51, 0.48, 0.42], slope: -0.35 },
+  WS2M: { points: [0.6, 0.58, 0.55, 0.53, 0.52, 0.49, 0.47, 0.44], slope: -0.06 },
+  ALLSKY_SFC_SW_DWN: { points: [0.35, 0.4, 0.38, 0.44, 0.46, 0.49, 0.51, 0.56], slope: 0.05 }
+};
+
+function MiniSparkline({ points = [], color }) {
+  if (!points.length) return null;
+  const w = 42;
+  const h = 16;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const span = Math.max(0.001, max - min);
+  const d = points
+    .map((p, idx) => {
+      const x = (idx / Math.max(1, points.length - 1)) * w;
+      const y = h - ((p - min) / span) * (h - 4) - 2;
+      return `${idx === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(' ');
+
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true" className="shrink-0">
+      <path d={d} fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 export default function VariableSelector({
   variables = [],
   selectedVariable = 'T2M',
-  onSelectVariable
+  onSelectVariable,
+  variableHints = {},
+  compact = false
 }) {
+  const { colors } = useTheme();
   const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [selectedCategory, setSelectedCategory] = useState('All');
 
-  const categories = ['ALL', ...new Set(variables.map(v => v.category))];
+  const categories = ['All', 'Atmosphere', 'Land', 'Ocean', 'Cryosphere'];
 
-  const filtered = variables.filter(v => {
-    const matchesSearch = v.name.toLowerCase().includes(search.toLowerCase()) ||
-                          v.parameter.toLowerCase().includes(search.toLowerCase()) ||
-                          v.definition.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = selectedCategory === 'ALL' || v.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  const filtered = useMemo(() => {
+    const allowedParams = DOMAIN_MAPPING[selectedCategory] || DOMAIN_MAPPING.All;
+    return variables.filter((v) => {
+      const q = search.trim().toLowerCase();
+      const matchesSearch =
+        !q ||
+        v.name.toLowerCase().includes(q) ||
+        v.parameter.toLowerCase().includes(q) ||
+        v.definition.toLowerCase().includes(q);
+      const matchesCategory = allowedParams.includes(v.parameter);
+      return matchesSearch && matchesCategory;
+    });
+  }, [variables, search, selectedCategory]);
 
   return (
-    <div className="bg-[#13263A] rounded-xl border border-[#1E3A56] p-4 shadow-lg space-y-4">
-      {/* Search and Category Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <div className="relative flex-1 w-full">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search variables by name, parameter (e.g. T2M, PRECTOTCORR), or definition..."
-            className="w-full bg-[#0D1B2A] border border-[#1E3A56] rounded-lg px-3.5 py-2 pl-9 text-sm text-white placeholder-[#9BAEC2] focus:outline-none focus:border-[#00D4FF]"
-          />
-          <Search className="w-4 h-4 text-[#9BAEC2] absolute left-3 top-2.5" />
-        </div>
+    <div className={compact ? 'space-y-2.5' : 'bg-[var(--card)] rounded-[14px] border border-[var(--border)] p-4 space-y-4'}>
+      {/* Search box */}
+      <div className="relative">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={compact ? 'Search variables (T2M, rain...)' : 'Search variables by name, parameter, or definition...'}
+          aria-label="Search environmental variables"
+          className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-[10px] px-3 py-1.5 pl-8 text-xs text-[var(--text)] placeholder-[var(--muted)] focus:outline-none focus:border-[var(--accent)]"
+        />
+        <Search className="w-3.5 h-3.5 text-[var(--muted)] absolute left-2.5 top-2" aria-hidden="true" />
+      </div>
 
-        {/* Category Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
-          {categories.map(cat => (
+      {/* Category Filter Chips */}
+      <div className="flex flex-wrap gap-1" role="group" aria-label="Variable categories">
+        {categories.map((cat) => {
+          const isActive = selectedCategory === cat;
+          return (
             <button
               key={cat}
+              type="button"
               onClick={() => setSelectedCategory(cat)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition ${
-                selectedCategory === cat
-                  ? 'bg-[#00D4FF] text-[#071426] font-semibold'
-                  : 'bg-[#0D1B2A] text-[#9BAEC2] hover:text-white border border-[#1E3A56]'
+              aria-pressed={isActive}
+              className={`px-2 py-0.5 rounded-full text-[11px] font-medium border transition-colors ${
+                isActive
+                  ? 'bg-[var(--accent)] text-[var(--accent-fg)] border-[var(--accent)] font-semibold'
+                  : 'bg-[var(--panel)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--text)]'
               }`}
             >
               {cat}
             </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Grid of Variable Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {filtered.map(item => {
-          const isSelected = selectedVariable === item.parameter;
-          const Icon = VARIABLE_ICONS[item.parameter] || Thermometer;
-          const accentClass = VARIABLE_ACCENTS[item.parameter] || 'text-[#00D4FF] bg-[#00D4FF]/10 border-[#00D4FF]/30';
-
-          return (
-            <div
-              key={item.parameter}
-              onClick={() => onSelectVariable(item.parameter)}
-              className={`cursor-pointer rounded-xl p-3.5 border transition-all relative flex flex-col justify-between ${
-                isSelected
-                  ? 'bg-[#0D1B2A] border-[#00D4FF] shadow-[0_0_15px_rgba(0,212,255,0.25)] ring-1 ring-[#00D4FF]'
-                  : 'bg-[#0D1B2A]/70 border-[#1E3A56] hover:border-[#9BAEC2]/50 hover:bg-[#0D1B2A]'
-              }`}
-            >
-              <div>
-                {/* Header: Icon, Code & Unit */}
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className={`p-2 rounded-lg border ${accentClass}`}>
-                      <Icon className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-xs font-bold text-white tracking-wide">
-                          {item.parameter}
-                        </span>
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#13263A] text-[#00D4FF] font-mono border border-[#1E3A56]">
-                          {item.unit}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-[#9BAEC2] block">{item.category}</span>
-                    </div>
-                  </div>
-
-                  {isSelected && (
-                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#00D4FF] text-[#071426]">
-                      <Check className="w-3.5 h-3.5 stroke-[3]" />
-                    </span>
-                  )}
-                </div>
-
-                {/* Full Name & Simple Definition */}
-                <h4 className="font-semibold text-sm text-white mb-1 leading-snug">
-                  {item.name}
-                </h4>
-                <p className="text-xs text-[#9BAEC2] leading-relaxed mb-3 line-clamp-2">
-                  {item.definition}
-                </p>
-              </div>
-
-              {/* Footer Metadata */}
-              <div className="pt-2 border-t border-[#1E3A56] text-[10px] space-y-1 text-[#9BAEC2]">
-                <div className="flex items-center justify-between">
-                  <span>NASA Source:</span>
-                  <span className="text-white font-medium truncate max-w-[170px]">{item.source.split('/')[0]}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Resolution:</span>
-                  <span className="text-white capitalize">{item.temporal_resolutions?.join(', ')}</span>
-                </div>
-              </div>
-            </div>
           );
         })}
+      </div>
+
+      {/* Variable List */}
+      <div className={compact ? 'space-y-1.5' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5'}>
+        {filtered.map((item) => {
+          const isSelected = selectedVariable === item.parameter;
+          const Icon = VARIABLE_ICONS[item.parameter] || Thermometer;
+          const hint = variableHints[item.parameter] || DEFAULT_SPARKLINES[item.parameter] || { points: [0, 0.2, 0.4], slope: 0 };
+          const isUp = hint.slope > 0.01;
+          const isDown = hint.slope < -0.01;
+          const semanticColor = isUp ? colors.warm : isDown ? colors.cool : colors.muted;
+          const TrendIcon = isUp ? TrendingUp : isDown ? TrendingDown : Minus;
+
+          return (
+            <button
+              key={item.parameter}
+              type="button"
+              onClick={() => onSelectVariable(item.parameter)}
+              aria-pressed={isSelected}
+              className={`w-full text-left rounded-[12px] p-2.5 border transition-colors flex items-center justify-between gap-2 relative overflow-hidden ${
+                isSelected
+                  ? 'bg-[var(--accent-soft)] border-[var(--accent)]'
+                  : 'bg-[var(--panel)] border-[var(--border)] hover:border-[var(--muted)]'
+              }`}
+            >
+              {/* Left Semantic Colour Bar */}
+              <span
+                className="w-1 self-stretch rounded-full shrink-0"
+                style={{ backgroundColor: semanticColor }}
+                aria-hidden="true"
+              />
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <Icon className="w-3.5 h-3.5 text-[var(--muted)] shrink-0" aria-hidden="true" />
+                  <span className="text-xs font-semibold text-[var(--text)] truncate">
+                    {item.short_name || item.name}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-0.5 text-[10px] font-mono text-[var(--muted)]">
+                  <span>{item.parameter}</span>
+                  <span>·</span>
+                  <span>{item.unit}</span>
+                </div>
+              </div>
+
+              {/* Sparkline + Arrow */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <MiniSparkline points={hint.points} color={semanticColor} />
+                <span
+                  className="inline-flex items-center gap-0.5 text-[10px] font-mono font-semibold"
+                  style={{ color: semanticColor }}
+                  title={`Global reference trend: ${hint.slope > 0 ? '+' : ''}${hint.slope}/dec`}
+                >
+                  <TrendIcon className="w-3 h-3" aria-hidden="true" />
+                  <span>{hint.slope > 0 ? '+' : ''}{Number(hint.slope).toFixed(2)}</span>
+                </span>
+              </div>
+            </button>
+          );
+        })}
+
+        {filtered.length === 0 && (
+          <p className="text-xs text-[var(--muted)] py-3 text-center col-span-full">
+            No matching variables for &ldquo;{search || selectedCategory}&rdquo;.
+          </p>
+        )}
       </div>
     </div>
   );

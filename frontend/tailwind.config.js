@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: ['selector', '[data-theme="dark"]'],
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -7,26 +8,34 @@ export default {
   theme: {
     extend: {
       colors: {
-        earth: {
-          darkest: '#071426',
-          dark: '#0D1B2A',
-          card: '#13263A',
-          border: '#1E3A56',
-          hover: '#19344E',
-          cyan: '#00D4FF',
-          green: '#35D07F',
-          text: '#FFFFFF',
-          muted: '#9BAEC2',
-          red: '#FF4D4D',
-          amber: '#F59E0B'
+        terra: {
+          bg: 'var(--bg)',
+          panel: 'var(--panel)',
+          card: 'var(--card)',
+          subtle: 'var(--card-subtle)',
+          border: 'var(--border)',
+          text: 'var(--text)',
+          muted: 'var(--muted)',
+          accent: 'var(--accent)',
+          accentFg: 'var(--accent-fg)',
+          warm: 'var(--warm)',
+          cool: 'var(--cool)',
+          sig: 'var(--sig)',
+          warn: 'var(--warn)',
+          changepoint: 'var(--changepoint)',
+          neutral: 'var(--neutral-cell)',
+          sea: 'var(--sea)'
         }
+      },
+      borderRadius: {
+        card: '14px'
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-        heading: ['Space Grotesk', 'Inter', 'sans-serif'],
+        heading: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'monospace']
       }
     },
   },
   plugins: [],
-}
+};

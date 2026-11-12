@@ -1,68 +1,73 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocation, useSearchParams, Link } from 'react-router-dom';
 import {
-  Search,
-  MapPin,
-  Calendar,
-  Layers,
-  TrendingUp,
-  Sparkles,
   FileText,
   Download,
   AlertTriangle,
-  ChevronDown,
-  ChevronUp,
   Loader2,
-  CheckCircle2,
-  XCircle,
-  HelpCircle,
-  BarChart2,
-  Activity,
-  Thermometer,
-  CloudRain,
-  Droplets,
-  Wind,
-  Sun,
   Share2,
   Check,
   RotateCcw,
   Info,
-  Compass
+  Play,
+  Compass,
+  Activity
 } from 'lucide-react';
 import {
   getVariables,
   analyzeTrend,
+  getAtlas,
   getPdfReportUrl,
   getCsvExportUrl
 } from '../services/api';
-import MapWorkspace from '../components/map/MapWorkspace';
+import { useTheme } from '../theme/ThemeContext';
+import {
+  Pill,
+  VerdictCard,
+  SignificanceBadge,
+  TrendArrow,
+  RangeSlider
+} from '../components/ui';
+import VariableSelector from '../components/VariableSelector';
+import LocationMiniMap from '../components/map/LocationMiniMap';
 import TimeSeriesChart from '../components/TimeSeriesChart';
 import YearlyChart from '../components/YearlyChart';
 import SeasonalChart from '../components/SeasonalChart';
+import SeasonalFingerprint from '../components/SeasonalFingerprint';
 import AskEarthPulseSection from '../components/AskEarthPulseSection';
+import { haversineKm, formatSigned } from '../utils/climateMath';
 
-const VARIABLE_ICONS = {
-  T2M: Thermometer,
-  PRECTOTCORR: CloudRain,
-  RH2M: Droplets,
-  WS2M: Wind,
-  ALLSKY_SFC_SW_DWN: Sun
-};
+const QUICK_PLACES = [
+  { name: 'Bengaluru, Karnataka', lat: 12.9716, lon: 77.5946 },
+  { name: 'Greenland Ice Sheet', lat: 72.0, lon: -40.0 },
+  { name: 'Sahel Region', lat: 14.4974, lon: 14.4524 },
+  { name: 'Amazon Basin', lat: -3.4653, lon: -62.2159 }
+];
 
 export default function DashboardPage() {
   const routerLocation = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { colors } = useTheme();
 
-  // Navigation / Preset routing if coming from URL query parameters or Atlas/preset navigation
+  // Initial URL / Navigation state
   const initialVariable = searchParams.get('var') || routerLocation.state?.variable || 'T2M';
-  const initialLat = searchParams.get('lat') ? parseFloat(searchParams.get('lat')) : (routerLocation.state?.latitude ?? 12.9716);
-  const initialLon = searchParams.get('lon') ? parseFloat(searchParams.get('lon')) : (routerLocation.state?.longitude ?? 77.5946);
-  const initialLocName = searchParams.get('loc') || routerLocation.state?.locationName || 'Bengaluru, Karnataka';
-  const initialStartYear = searchParams.get('start') ? parseInt(searchParams.get('start'), 10) : 1990;
-  const initialEndYear = searchParams.get('end') ? parseInt(searchParams.get('end'), 10) : 2023;
+  const initialLat = searchParams.get('lat')
+    ? parseFloat(searchParams.get('lat'))
+    : routerLocation.state?.latitude ?? 12.9716;
+  const initialLon = searchParams.get('lon')
+    ? parseFloat(searchParams.get('lon'))
+    : routerLocation.state?.longitude ?? 77.5946;
+  const initialLocName =
+    searchParams.get('loc') || routerLocation.state?.locationName || 'Bengaluru, Karnataka';
+  const initialStartYear = searchParams.get('start')
+    ? parseInt(searchParams.get('start'), 10)
+    : routerLocation.state?.startYear ?? 1990;
+  const initialEndYear = searchParams.get('end')
+    ? parseInt(searchParams.get('end'), 10)
+    : routerLocation.state?.endYear ?? 2023;
   const initialFreq = searchParams.get('freq') || 'monthly';
 
-  // 3-Step Flow Form State
+  // Form / Stepper State
   const [selectedVariable, setSelectedVariable] = useState(initialVariable);
   const [locationName, setLocationName] = useState(initialLocName);
   const [latitude, setLatitude] = useState(initialLat);
@@ -70,632 +75,684 @@ export default function DashboardPage() {
   const [startYear, setStartYear] = useState(initialStartYear);
   const [endYear, setEndYear] = useState(initialEndYear);
   const [frequency, setFrequency] = useState(initialFreq);
+  const [activeTab, setActiveTab] = useState('timeseries'); // 'timeseries' | 'seasonal' | 'yearly' | 'anomaly' | 'export'
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // App & Data States
+  // Data States
   const [variables, setVariables] = useState([]);
+  const [atlasData, setAtlasData] = useState(null);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [showAdvancedStats, setShowAdvancedStats] = useState(false);
-  const [showExplainSection, setShowExplainSection] = useState(true);
-  const [secondaryTab, setSecondaryTab] = useState('yearly');
-  const [mobileMapOpen, setMobileMapOpen] = useState(false);
 
-  // Load variables and trigger initial analysis
+  const runAnalysis = useCallback(
+    async (customPayload = null) => {
+      setLoading(true);
+      setError(null);
+
+      const payload = customPayload || {
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+        location_name: locationName,
+        variable: selectedVariable,
+        start_date: `${startYear}-01-01`,
+        end_date: `${endYear}-12-31`,
+        frequency
+      };
+
+      setSearchParams(
+        {
+          var: payload.variable,
+          lat: String(payload.latitude),
+          lon: String(payload.longitude),
+          loc: payload.location_name,
+          start: String(payload.start_date.slice(0, 4)),
+          end: String(payload.end_date.slice(0, 4)),
+          freq: payload.frequency
+        },
+        { replace: true }
+      );
+
+      try {
+        const data = await analyzeTrend(payload);
+        setAnalysisResult(data);
+      } catch (err) {
+        setError(
+          err.response?.data?.detail || err.message || 'Analysis pipeline could not complete.'
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [latitude, longitude, locationName, selectedVariable, startYear, endYear, frequency, setSearchParams]
+  );
+
+  // Initial mount fetch
   useEffect(() => {
     getVariables()
       .then((vars) => setVariables(vars || []))
       .catch(() => {});
 
-    // Initial analysis run
     runAnalysis({
-      variable: initialVariable,
       latitude: initialLat,
       longitude: initialLon,
       location_name: initialLocName,
-      start_date: `${startYear}-01-01`,
-      end_date: `${endYear}-12-31`,
-      frequency: 'monthly'
+      variable: initialVariable,
+      start_date: `${initialStartYear}-01-01`,
+      end_date: `${initialEndYear}-12-31`,
+      frequency: initialFreq
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const runAnalysis = async (customPayload = null) => {
-    setLoading(true);
-    setError(null);
+  // Load atlas grid for selected variable (mini-map choropleth + WHERE baseline comparison)
+  useEffect(() => {
+    getAtlas(selectedVariable)
+      .then((res) => setAtlasData(res))
+      .catch(() => setAtlasData(null));
+  }, [selectedVariable]);
 
-    const payload = customPayload || {
-      latitude: parseFloat(latitude),
-      longitude: parseFloat(longitude),
-      location_name: locationName,
-      variable: selectedVariable,
-      start_date: `${startYear}-01-01`,
-      end_date: `${endYear}-12-31`,
-      frequency: frequency
-    };
-
-    // Keep URL query parameters synchronized (shareable read-only URL state)
-    setSearchParams({
-      var: payload.variable,
-      lat: String(payload.latitude),
-      lon: String(payload.longitude),
-      loc: payload.location_name,
-      start: String(startYear),
-      end: String(endYear),
-      freq: frequency
-    }, { replace: true });
-
-    try {
-      const data = await analyzeTrend(payload);
-      setAnalysisResult(data);
-    } catch (err) {
-      setError(err.response?.data?.detail || err.message || 'Analysis pipeline execution failed.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const copyShareableLink = () => {
-    navigator.clipboard.writeText(window.location.href);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2500);
-  };
-
-  // Map coordinate callback (updates state WITHOUT triggering analysis)
   const handleMapLocationChange = useCallback((name, lat, lon) => {
     setLocationName(name);
     setLatitude(lat);
     setLongitude(lon);
   }, []);
 
+  const copyShareableLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2200);
+  };
+
   const summary = analysisResult?.summary;
   const timeSeriesData = analysisResult?.data?.time_series || [];
   const yearlyData = analysisResult?.data?.yearly_averages || [];
   const monthlyData = analysisResult?.data?.monthly_variation || [];
 
-  const activeVarMeta = variables.find((v) => v.parameter === selectedVariable) || {
-    name: '2-Meter Air Temperature',
-    unit: '°C',
-    definition: 'Surface atmospheric air temperature at 2 meters above ground.'
-  };
+  const activeVarMeta = useMemo(
+    () =>
+      variables.find((v) => v.parameter === (summary?.variable || selectedVariable)) || {
+        name: 'Temperature at 2 Metres',
+        short_name: 'Air Temperature',
+        unit: '°C',
+        parameter: selectedVariable
+      },
+    [variables, summary?.variable, selectedVariable]
+  );
+
+  // Compute WHERE regional baseline comparison against nearest atlas cell & global mean
+  const regionalComparisonText = useMemo(() => {
+    if (!summary || !atlasData?.cells?.length) {
+      return `${latitude.toFixed(2)}°, ${longitude.toFixed(2)}° · ~50 km MERRA-2 grid cell`;
+    }
+    let nearest = null;
+    let minDist = Infinity;
+    let sumSlopes = 0;
+    for (const c of atlasData.cells) {
+      sumSlopes += c.sens_slope_per_decade ?? c.sen_slope_per_decade ?? 0;
+      const d = haversineKm(latitude, longitude, c.latitude, c.longitude);
+      if (d < minDist) {
+        minDist = d;
+        nearest = c;
+      }
+    }
+    const globalMeanSlope = sumSlopes / atlasData.cells.length;
+    const localDecade = summary.rate_per_decade ?? summary.sens_slope_per_year * 10;
+    const diffGlobal = localDecade - globalMeanSlope;
+    const nearestMean = nearest?.mean_value ?? nearest?.mean_climatology;
+    const meanPart = nearestMean !== undefined && nearestMean !== null ? `Grid baseline ${nearestMean}${summary.unit}` : '';
+    return `${formatSigned(diffGlobal, 2)} ${summary.unit}/dec vs global mean (${formatSigned(globalMeanSlope, 2)})${meanPart ? ` · ${meanPart}` : ''}`;
+  }, [summary, atlasData, latitude, longitude]);
+
+  // Semantic direction wording for WHAT card
+  const whatDirection = useMemo(() => {
+    if (!summary) return { word: 'Awaiting run', color: colors.muted };
+    const slope = summary.sens_slope_per_year ?? 0;
+    const isTemp = summary.variable === 'T2M';
+    if (!summary.is_significant) {
+      return {
+        word: slope > 0 ? 'Slight rise (non-sig.)' : slope < 0 ? 'Slight fall (non-sig.)' : 'No clear trend',
+        color: colors.muted
+      };
+    }
+    if (slope > 0) {
+      return { word: isTemp ? 'Warming' : 'Increasing', color: colors.warm };
+    }
+    return { word: isTemp ? 'Cooling' : 'Decreasing', color: colors.cool };
+  }, [summary, colors]);
+
+  const effectivePValue =
+    summary?.autocorrelation?.is_significant && summary?.autocorrelation?.adjusted_mk_p_value !== undefined
+      ? summary.autocorrelation.adjusted_mk_p_value
+      : summary?.mann_kendall?.p_value;
+
+  const isAutoAdjusted = Boolean(
+    summary?.autocorrelation?.is_significant &&
+      summary?.autocorrelation?.adjusted_mk_p_value !== undefined &&
+      summary?.autocorrelation?.adjusted_mk_p_value !== null
+  );
+
+  const significanceLabel = useMemo(() => {
+    if (!summary) return '—';
+    if (effectivePValue !== undefined && effectivePValue >= 0.05 && effectivePValue < 0.1) {
+      return 'Inconclusive';
+    }
+    return summary.is_significant ? 'Yes' : 'No';
+  }, [summary, effectivePValue]);
+
+  const pdfUrl = getPdfReportUrl({
+    latitude,
+    longitude,
+    location_name: locationName,
+    variable: selectedVariable,
+    start_date: `${startYear}-01-01`,
+    end_date: `${endYear}-12-31`,
+    frequency
+  });
+
+  const csvUrl = getCsvExportUrl({
+    latitude,
+    longitude,
+    location_name: locationName,
+    variable: selectedVariable,
+    start_date: `${startYear}-01-01`,
+    end_date: `${endYear}-12-31`,
+    frequency
+  });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
-      {/* Page Title */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-heading tracking-tight">
-            Environmental Trend Investigation
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-400">
-            A 3-step scientific journey: choose your variable, select any location, set your time horizon, and analyze.
-          </p>
-        </div>
-
-        {summary && (
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={copyShareableLink}
-              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-[#0D1B2A] hover:bg-[#13263A] text-slate-300 border border-[#1E3A56] text-xs font-semibold transition"
-              title="Copy shareable link with current environmental parameters"
-            >
-              {copiedLink ? (
-                <>
-                  <Check className="w-4 h-4 text-emerald-400" />
-                  <span className="text-emerald-400">Link Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Share2 className="w-4 h-4 text-[#00D4FF]" />
-                  <span>Share Analysis</span>
-                </>
-              )}
-            </button>
-
-            <a
-              href={getPdfReportUrl({
-                latitude,
-                longitude,
-                location_name: locationName,
-                variable: selectedVariable,
-                start_date: `${startYear}-01-01`,
-                end_date: `${endYear}-12-31`,
-                frequency
-              })}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-[#0D1B2A] hover:bg-[#13263A] text-[#00D4FF] border border-[#1E3A56] text-xs font-semibold transition"
-            >
-              <FileText className="w-4 h-4" />
-              <span>Download PDF</span>
-            </a>
-
-            <a
-              href={getCsvExportUrl({
-                latitude,
-                longitude,
-                location_name: locationName,
-                variable: selectedVariable,
-                start_date: `${startYear}-01-01`,
-                end_date: `${endYear}-12-31`,
-                frequency
-              })}
-              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-[#0D1B2A] hover:bg-[#13263A] text-slate-300 border border-[#1E3A56] text-xs font-semibold transition"
-            >
-              <Download className="w-4 h-4" />
-              <span>CSV Data</span>
-            </a>
-          </div>
-        )}
-      </div>
-
-      {/* GUIDED 3-STEP FLOW WORKBENCH */}
-      <div className="bg-[#0D1B2A] border border-[#1E3A56] rounded-3xl p-5 sm:p-6 shadow-2xl space-y-6">
-        
-        {/* STEP 1: What are you curious about? */}
-        <div className="space-y-3">
-          <div className="flex items-center space-x-2">
-            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#00D4FF] text-[#071426] text-xs font-bold font-mono">1</span>
-            <h2 className="text-sm sm:text-base font-bold text-white font-heading">
-              What environmental variable are you curious about?
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {variables.map((v) => {
-              const Icon = VARIABLE_ICONS[v.parameter] || Thermometer;
-              const isSelected = selectedVariable === v.parameter;
-              return (
-                <button
-                  key={v.parameter}
-                  type="button"
-                  onClick={() => setSelectedVariable(v.parameter)}
-                  className={`p-3.5 rounded-2xl border text-left transition flex flex-col justify-between space-y-2 relative ${
-                    isSelected
-                      ? 'bg-[#13263A] border-[#00D4FF] shadow-lg shadow-[#00D4FF]/20 ring-1 ring-[#00D4FF]'
-                      : 'bg-[#13263A]/60 border-[#1E3A56] hover:border-slate-500 hover:bg-[#13263A]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className={`p-2 rounded-xl ${isSelected ? 'bg-[#00D4FF] text-[#071426]' : 'bg-[#0D1B2A] text-[#00D4FF]'}`}>
-                      <Icon className="w-4 h-4" />
-                    </div>
-                    <span className="text-[10px] font-mono text-slate-400 font-semibold px-2 py-0.5 rounded bg-[#0D1B2A] border border-[#1E3A56]">
-                      {v.unit}
-                    </span>
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-bold text-white font-heading leading-tight">{v.name}</h3>
-                    <p className="text-[11px] text-slate-400 line-clamp-2 mt-1 leading-snug">
-                      {v.definition}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* STEP 2: Where? (Map Workspace with 390px Mobile Sheet) */}
-        <div className="space-y-3 pt-4 border-t border-[#1E3A56]/60" role="region" aria-label="Geographic Location Selection">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#00D4FF] text-[#071426] text-xs font-bold font-mono">2</span>
-              <h2 className="text-sm sm:text-base font-bold text-white font-heading">
-                Where? (Drop a pin, explore NASA Satellite, or view Global Atlas)
-              </h2>
-            </div>
-
-            {/* Mobile Map Drawer Toggle */}
-            <button
-              type="button"
-              onClick={() => setMobileMapOpen(!mobileMapOpen)}
-              className="sm:hidden flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-[#13263A] text-[#00D4FF] border border-[#1E3A56] text-xs font-semibold tap-target-44"
-              aria-expanded={mobileMapOpen}
-              aria-label="Toggle interactive map view on mobile"
-            >
-              <MapPin className="w-3.5 h-3.5" />
-              <span>{mobileMapOpen ? 'Collapse Map' : 'Open Map'}</span>
-              {mobileMapOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-            </button>
-
-            <div className="text-xs font-mono text-[#00D4FF] hidden sm:block">
-              Coordinates: {latitude.toFixed(2)}°, {longitude.toFixed(2)}°
-            </div>
-          </div>
-
-          {/* Location Summary Pill on Mobile */}
-          <div className="sm:hidden flex items-center justify-between text-xs font-mono text-slate-300 bg-[#13263A] px-3.5 py-2.5 rounded-xl border border-[#1E3A56]">
-            <span className="truncate font-semibold text-white">{locationName}</span>
-            <span className="text-[#00D4FF] shrink-0">[{latitude.toFixed(2)}°, {longitude.toFixed(2)}°]</span>
-          </div>
-
-          {/* Map Container: Collapsible on 390px mobile, fixed 460px on desktop */}
-          <div className={`${mobileMapOpen ? 'block' : 'hidden sm:block'} h-[600px] sm:h-[640px] transition-all`}>
-            <MapWorkspace
-              locationName={locationName}
-              latitude={latitude}
-              longitude={longitude}
-              onLocationChange={handleMapLocationChange}
-              activeVariable={selectedVariable}
-            />
-          </div>
-        </div>
-
-        {/* STEP 3: When? (Period & Resolution) + Sticky Analyze Button */}
-        <div className="space-y-4 pt-4 border-t border-[#1E3A56]/60">
-          <div className="flex items-center space-x-2">
-            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#00D4FF] text-[#071426] text-xs font-bold font-mono">3</span>
-            <h2 className="text-sm sm:text-base font-bold text-white font-heading">
-              When? (Multi-decadal period: 1990 to {endYear})
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center bg-[#13263A] p-4 rounded-2xl border border-[#1E3A56]">
-            {/* Start Year Slider */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs text-slate-300 font-medium">
-                <span>Start Year: <b className="text-white font-mono">{startYear}</b></span>
-                <span className="text-slate-400 font-mono">1981–2015</span>
+    <div className="bg-[var(--bg)] text-[var(--text)] flex-1 lg:flex-none lg:h-[calc(100vh-56px)] lg:max-h-[calc(100vh-56px)] lg:overflow-hidden">
+      <div className="h-full max-w-[1680px] mx-auto grid grid-cols-1 lg:grid-cols-[264px_minmax(0,1fr)_316px] xl:grid-cols-[292px_minmax(0,1fr)_340px] lg:grid-rows-[minmax(0,1fr)]">
+        {/* LEFT RAIL: 3-Step Investigation Controls */}
+        <aside
+          aria-label="Investigation Parameters"
+          className="bg-[var(--panel)] border-b lg:border-b-0 lg:border-r border-[var(--border)] flex flex-col min-h-0 lg:h-full lg:overflow-hidden"
+        >
+          <div className="flex-1 overflow-y-auto p-4 space-y-5">
+            {/* STEP 1: Variable */}
+            <section className="space-y-2.5" aria-labelledby="step-var-heading">
+              <div className="flex items-center justify-between">
+                <h2 id="step-var-heading" className="text-xs font-bold uppercase tracking-wider text-[var(--muted)] flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-[var(--card-subtle)] border border-[var(--border)] text-[var(--text)] font-mono text-[11px] flex items-center justify-center">
+                    1
+                  </span>
+                  <span>Variable</span>
+                </h2>
+                <span className="text-[10px] font-mono text-[var(--muted)]">{selectedVariable}</span>
               </div>
-              <input
-                type="range"
-                min={1981}
-                max={2015}
-                value={startYear}
-                onChange={(e) => setStartYear(parseInt(e.target.value, 10))}
-                className="w-full accent-[#00D4FF] h-2 bg-[#0D1B2A] rounded-lg cursor-pointer"
+
+              <VariableSelector
+                variables={variables}
+                selectedVariable={selectedVariable}
+                onSelectVariable={setSelectedVariable}
+                compact={true}
               />
-            </div>
+            </section>
 
-            {/* End Year Slider */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs text-slate-300 font-medium">
-                <span>End Year: <b className="text-white font-mono">{endYear}</b></span>
-                <span className="text-slate-400 font-mono">2000–2023</span>
+            {/* STEP 2: Where */}
+            <section className="space-y-2.5 pt-4 border-t border-[var(--border)]" aria-labelledby="step-where-heading">
+              <div className="flex items-center justify-between">
+                <h2 id="step-where-heading" className="text-xs font-bold uppercase tracking-wider text-[var(--muted)] flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-[var(--card-subtle)] border border-[var(--border)] text-[var(--text)] font-mono text-[11px] flex items-center justify-center">
+                    2
+                  </span>
+                  <span>Where</span>
+                </h2>
               </div>
-              <input
-                type="range"
-                min={2000}
-                max={2023}
-                value={endYear}
-                onChange={(e) => setEndYear(parseInt(e.target.value, 10))}
-                className="w-full accent-[#00D4FF] h-2 bg-[#0D1B2A] rounded-lg cursor-pointer"
+
+              {/* Quick Benchmark Chips */}
+              <div className="flex flex-wrap gap-1">
+                {QUICK_PLACES.map((spot) => {
+                  const isMatch = Math.abs(spot.lat - latitude) < 0.1 && Math.abs(spot.lon - longitude) < 0.1;
+                  return (
+                    <button
+                      key={spot.name}
+                      type="button"
+                      onClick={() => handleMapLocationChange(spot.name, spot.lat, spot.lon)}
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${
+                        isMatch
+                          ? 'bg-[var(--accent)] text-[var(--accent-fg)] border-[var(--accent)] font-semibold'
+                          : 'bg-[var(--card)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--text)]'
+                      }`}
+                    >
+                      {spot.name.split(',')[0]}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <LocationMiniMap
+                latitude={latitude}
+                longitude={longitude}
+                locationName={locationName}
+                onLocationChange={handleMapLocationChange}
+                atlasCells={atlasData?.cells || []}
+                activeVariable={selectedVariable}
               />
-            </div>
+            </section>
 
-            {/* Resolution Buttons */}
-            <div className="space-y-1">
-              <span className="text-xs text-slate-300 font-medium block">Resolution:</span>
-              <div className="flex bg-[#0D1B2A] p-1 rounded-xl border border-[#1E3A56]">
-                <button
-                  type="button"
-                  onClick={() => setFrequency('monthly')}
-                  className={`flex-1 py-1.5 text-xs rounded-lg font-semibold transition ${
-                    frequency === 'monthly'
-                      ? 'bg-[#00D4FF] text-[#071426] font-bold shadow-sm'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Monthly (Standard)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFrequency('daily')}
-                  className={`flex-1 py-1.5 text-xs rounded-lg font-semibold transition ${
-                    frequency === 'daily'
-                      ? 'bg-[#00D4FF] text-[#071426] font-bold shadow-sm'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Daily
-                </button>
+            {/* STEP 3: When */}
+            <section className="space-y-2.5 pt-4 border-t border-[var(--border)]" aria-labelledby="step-when-heading">
+              <div className="flex items-center justify-between">
+                <h2 id="step-when-heading" className="text-xs font-bold uppercase tracking-wider text-[var(--muted)] flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-[var(--card-subtle)] border border-[var(--border)] text-[var(--text)] font-mono text-[11px] flex items-center justify-center">
+                    3
+                  </span>
+                  <span>When</span>
+                </h2>
+                <span className="text-[10px] font-mono text-[var(--muted)]">1981–2023</span>
               </div>
-            </div>
+
+              <div className="bg-[var(--card)] border border-[var(--border)] rounded-[12px] p-3 space-y-3">
+                <RangeSlider
+                  min={1981}
+                  max={2023}
+                  startValue={startYear}
+                  endValue={endYear}
+                  onChange={(s, e) => {
+                    setStartYear(s);
+                    setEndYear(e);
+                  }}
+                  label="Select start and end years"
+                />
+
+                <div className="flex items-center gap-1 p-0.5 rounded-[10px] bg-[var(--panel)] border border-[var(--border)]">
+                  {['monthly', 'daily'].map((resOpt) => (
+                    <button
+                      key={resOpt}
+                      type="button"
+                      onClick={() => setFrequency(resOpt)}
+                      aria-pressed={frequency === resOpt}
+                      className={`flex-1 py-1 rounded-[8px] text-[11px] font-semibold capitalize transition-colors ${
+                        frequency === resOpt
+                          ? 'bg-[var(--accent)] text-[var(--accent-fg)]'
+                          : 'text-[var(--muted)] hover:text-[var(--text)]'
+                      }`}
+                    >
+                      {resOpt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </section>
           </div>
 
-          {/* Sticky Action Button */}
-          <div className="pt-2 flex justify-end">
+          {/* Sticky Primary Action Button */}
+          <div className="sticky bottom-0 p-3.5 bg-[var(--panel)] border-t border-[var(--border)]">
             <button
               type="button"
               onClick={() => runAnalysis()}
               disabled={loading}
-              className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-[#00D4FF] to-[#0099FF] text-[#071426] font-extrabold text-sm sm:text-base hover:brightness-110 transition shadow-xl shadow-[#00D4FF]/25 flex items-center justify-center space-x-2 active:scale-95 disabled:opacity-50"
+              className="w-full py-2.5 px-4 rounded-[12px] bg-[var(--accent)] text-[var(--accent-fg)] font-bold text-sm inline-flex items-center justify-center gap-2 hover:opacity-95 transition-opacity disabled:opacity-50"
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Computing Non-Parametric Statistics...</span>
+                  <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                  <span>Running analysis...</span>
                 </>
               ) : (
                 <>
-                  <TrendingUp className="w-5 h-5" />
-                  <span>Analyze Environmental Trends</span>
+                  <Play className="w-4 h-4 fill-current" aria-hidden="true" />
+                  <span>Run analysis</span>
                 </>
               )}
             </button>
           </div>
-        </div>
+        </aside>
 
-      </div>
-
-      {/* Friendly Error Callout with Safe Fallbacks */}
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/30 p-5 rounded-3xl space-y-4 shadow-xl">
-          <div className="flex items-start space-x-3.5">
-            <div className="p-2.5 rounded-2xl bg-red-500/20 text-red-400 shrink-0">
-              <AlertTriangle className="w-5 h-5" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-sm font-bold text-red-200">Analysis Encountered an Issue</h3>
-              <p className="text-xs text-red-300/90 leading-relaxed">{error}</p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 pt-2 pl-0 sm:pl-11">
-            <button
-              type="button"
-              onClick={() => runAnalysis()}
-              className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-bold transition flex items-center space-x-1.5 shadow-lg shadow-red-500/20 active:scale-95"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Retry Analysis</span>
-            </button>
-            <Link
-              to="/cases"
-              className="px-4 py-2 rounded-xl bg-[#0D1B2A] hover:bg-[#13263A] border border-[#1E3A56] text-[#00D4FF] text-xs font-bold transition flex items-center space-x-1.5"
-            >
-              <Compass className="w-3.5 h-3.5" />
-              <span>Explore Verified Detective Cases</span>
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {/* RESULTS PRESENTATION ORDER */}
-      {summary && (
-        <div className="space-y-6 animate-fade-in">
-
-          {/* Open Ocean Coordinates Advisory */}
-          {summary.is_ocean && (
-            <div className="bg-blue-500/15 border border-blue-500/40 p-4 rounded-2xl flex items-start space-x-3 text-blue-200 text-xs sm:text-sm">
-              <Info className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
-              <div>
-                <b className="font-bold">Open Ocean Coordinates ({latitude.toFixed(2)}°, {longitude.toFixed(2)}°):</b>
-                <p className="text-xs text-blue-300/90 mt-1">
-                  Direct ground weather stations are not installed at open sea coordinates. Observations reflect NASA MERRA-2 global atmospheric reanalysis and spaceborne radiometry data.
-                </p>
+        {/* CENTRE WORKBENCH: Header + Primary Chart + Seasonal Fingerprint */}
+        <section
+          aria-label="Analysis Workspace"
+          className="flex flex-col min-h-0 lg:h-full lg:overflow-y-auto p-4 sm:p-5 space-y-4"
+        >
+          {/* Page Header & Tab Pills */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[var(--border)]">
+            <div className="min-w-0">
+              <div className="text-[11px] font-mono uppercase tracking-wider text-[var(--muted)]">
+                Mission Control
               </div>
-            </div>
-          )}
-
-          {/* 1. Persistent AMBER Banner if Demonstration Data */}
-          {summary.is_demonstration && (
-            <div className="bg-amber-500/15 border border-amber-500/50 p-3.5 rounded-2xl flex items-center space-x-3 text-amber-300 text-xs sm:text-sm">
-              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
-              <div>
-                <b className="font-bold">SAMPLE DATA — NOT NASA OBSERVATIONS:</b>
-                <span className="ml-1">
-                  The live NASA POWER gateway was temporarily unreachable. Displaying calibrated demonstration values.
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* 2. One-Sentence Plain English HEADLINE */}
-          <div className="bg-gradient-to-r from-[#0D1B2A] via-[#13263A] to-[#0D1B2A] border border-[#1E3A56] p-5 rounded-2xl shadow-xl flex items-center space-x-3">
-            <div className={`p-2.5 rounded-xl shrink-0 ${
-              summary.is_significant && summary.sens_slope_per_year > 0
-                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                : summary.is_significant && summary.sens_slope_per_year < 0
-                ? 'bg-red-500/20 text-red-400 border border-red-500/40'
-                : 'bg-slate-500/20 text-slate-300 border border-slate-500/40'
-            }`}>
-              <Activity className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Scientific Assessment Headline</div>
-              <h2 className="text-base sm:text-lg font-bold text-white font-heading leading-snug">
-                {summary.headline || `${activeVarMeta.name} exhibits ${summary.trend_direction} trend in ${locationName}.`}
-              </h2>
-            </div>
-          </div>
-
-          {/* 3. Hero Chart: Observations + Trend Line + 95% CI Band */}
-          <TimeSeriesChart
-            data={timeSeriesData}
-            variableName={summary.variable_name}
-            unit={summary.unit}
-            pettitt={summary.pettitt}
-            headline={summary.headline}
-            onDownloadCsv={() => {
-              window.location.href = getCsvExportUrl({
-                latitude,
-                longitude,
-                location_name: locationName,
-                variable: selectedVariable,
-                start_date: `${startYear}-01-01`,
-                end_date: `${endYear}-12-31`,
-                frequency
-              });
-            }}
-          />
-
-          {/* 4. Four Core Stat Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Card 1: Rate Per Decade */}
-            <div className="bg-[#13263A] border border-[#1E3A56] p-4 rounded-2xl shadow-lg space-y-1">
-              <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Sen's Rate of Change</div>
-              <div className="text-2xl font-extrabold text-[#00D4FF] font-mono">
-                {summary.rate_per_decade > 0 ? '+' : ''}{summary.rate_per_decade}
-                <span className="text-xs text-slate-400 font-normal ml-1">{summary.unit}/dec</span>
-              </div>
-              <div className="text-[11px] text-slate-400 font-mono">
-                ({summary.sens_slope_per_year > 0 ? '+' : ''}{summary.sens_slope_per_year.toFixed(4)} {summary.unit}/yr)
-              </div>
+              <h1 className="text-lg sm:text-xl font-bold text-[var(--text)] tracking-tight truncate">
+                Investigating / {activeVarMeta.short_name || activeVarMeta.name} ·{' '}
+                <span className="text-[var(--accent)]">{locationName}</span>
+              </h1>
             </div>
 
-            {/* Card 2: P-Value & Significance (Color-blind safe) */}
-            <div className="bg-[#13263A] border border-[#1E3A56] p-4 rounded-2xl shadow-lg space-y-1">
-              <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Statistical Significance</div>
-              <div className="flex items-center space-x-2">
-                <span
-                  className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
-                    summary.is_significant && summary.sens_slope_per_year > 0
-                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40'
-                      : summary.is_significant && summary.sens_slope_per_year < 0
-                      ? 'bg-red-500/15 text-red-400 border-red-500/40'
-                      : 'bg-slate-500/15 text-slate-400 border-slate-500/40'
-                  }`}
+            <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Visualization tabs">
+              {[
+                { id: 'timeseries', label: 'Time series' },
+                { id: 'seasonal', label: 'Seasonal' },
+                { id: 'yearly', label: 'Yearly' },
+                { id: 'anomaly', label: 'Anomaly' },
+                { id: 'export', label: 'Export' }
+              ].map((t) => (
+                <Pill
+                  key={t.id}
+                  size="sm"
+                  active={activeTab === t.id}
+                  onClick={() => setActiveTab(t.id)}
                 >
-                  {summary.is_significant ? <CheckCircle2 className="w-3.5 h-3.5" /> : <HelpCircle className="w-3.5 h-3.5" />}
-                  <span>{summary.is_significant ? (summary.sens_slope_per_year > 0 ? 'Sig. Increase' : 'Sig. Decrease') : 'No Significant Trend'}</span>
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-400 font-mono pt-0.5">
-                p-value: <b className="text-white font-mono">{summary.mann_kendall?.p_value?.toFixed(5) || 'N/A'}</b> (α = 0.05)
-              </div>
-            </div>
-
-            {/* Card 3: Total Estimated Change */}
-            <div className="bg-[#13263A] border border-[#1E3A56] p-4 rounded-2xl shadow-lg space-y-1">
-              <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Estimated Total Shift</div>
-              <div className="text-2xl font-extrabold text-white font-mono">
-                {summary.total_change > 0 ? '+' : ''}{summary.total_change}
-                <span className="text-xs text-slate-400 font-normal ml-1">{summary.unit}</span>
-              </div>
-              <div className="text-[11px] text-slate-400 font-mono">
-                Across {endYear - startYear + 1} years ({startYear}–{endYear})
-              </div>
-            </div>
-
-            {/* Card 4: Data Quality & Grid */}
-            <div className="bg-[#13263A] border border-[#1E3A56] p-4 rounded-2xl shadow-lg space-y-1">
-              <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Data Quality & Sensor Grid</div>
-              <div className="text-2xl font-extrabold text-[#35D07F] font-mono">
-                {summary.observation_count}
-                <span className="text-xs text-slate-400 font-normal ml-1">obs ({100 - summary.missing_percentage}%)</span>
-              </div>
-              <div className="text-[11px] text-slate-400 font-mono">
-                ~50 km cell &bull; {summary.source}
-              </div>
+                  {t.label}
+                </Pill>
+              ))}
             </div>
           </div>
 
-          {/* 5. Collapsed Advanced Statistics Accordion */}
-          <div className="bg-[#13263A] border border-[#1E3A56] rounded-2xl overflow-hidden shadow-xl">
-            <button
-              type="button"
-              onClick={() => setShowAdvancedStats(!showAdvancedStats)}
-              className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-[#1E3A56]/30 transition"
+          {/* Alerts: Demonstration / Ocean */}
+          {summary?.is_demonstration && (
+            <div
+              className="p-3 rounded-[14px] border flex items-center gap-3 text-xs"
+              style={{
+                backgroundColor: 'var(--warn-soft)',
+                borderColor: 'var(--warn)',
+                color: 'var(--text)'
+              }}
+              role="alert"
             >
-              <div className="flex items-center space-x-2">
-                <BarChart2 className="w-4 h-4 text-[#00D4FF]" />
-                <span className="text-sm font-bold text-white font-heading">Advanced Statistical Indicators</span>
-                <span className="text-xs text-slate-400 font-mono">(Autocorrelation, Pettitt Test, Seasonal MK)</span>
+              <AlertTriangle className="w-4 h-4 shrink-0" style={{ color: 'var(--warn)' }} aria-hidden="true" />
+              <div>
+                <strong className="font-bold">SAMPLE DATA — NOT NASA OBSERVATIONS:</strong> Live NASA POWER endpoint unreachable; showing calibrated fallback demonstration series.
               </div>
-              {showAdvancedStats ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-            </button>
+            </div>
+          )}
 
-            {showAdvancedStats && (
-              <div className="p-5 border-t border-[#1E3A56] space-y-4 text-xs">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  
-                  {/* OLS Linear Regression */}
-                  <div className="bg-[#0D1B2A] p-3.5 rounded-xl border border-[#1E3A56] space-y-1 font-mono">
-                    <div className="text-slate-400 font-sans font-bold">OLS Regression Parameters</div>
-                    <div>Slope: <b className="text-white">{summary.linear_regression?.slope_per_year?.toFixed(4)} {summary.unit}/yr</b></div>
-                    <div>Intercept: <b className="text-white">{summary.linear_regression?.intercept?.toFixed(2)}</b></div>
-                    <div>R² Score: <b className="text-[#00D4FF]">{summary.linear_regression?.r_squared?.toFixed(4)}</b></div>
-                    <div>p-value: <b className="text-white">{summary.linear_regression?.p_value?.toFixed(5)}</b></div>
-                  </div>
+          {summary?.is_ocean && (
+            <div className="p-3 rounded-[14px] border border-[var(--border)] bg-[var(--card)] flex items-start gap-2.5 text-xs text-[var(--muted)]">
+              <Info className="w-4 h-4 shrink-0 text-[var(--accent)] mt-0.5" aria-hidden="true" />
+              <span>
+                <strong className="text-[var(--text)]">Marine Grid Cell:</strong> Open ocean coordinates utilize NASA MERRA-2 atmospheric assimilation and CERES radiometry rather than land weather stations.
+              </span>
+            </div>
+          )}
 
-                  {/* Mann-Kendall Test Statistics */}
-                  <div className="bg-[#0D1B2A] p-3.5 rounded-xl border border-[#1E3A56] space-y-1 font-mono">
-                    <div className="text-slate-400 font-sans font-bold">Mann-Kendall Details</div>
-                    <div>Tau (τ): <b className="text-white">{summary.mann_kendall?.tau?.toFixed(4)}</b></div>
-                    <div>S-Statistic: <b className="text-white">{summary.mann_kendall?.s}</b></div>
-                    <div>Variance Var(S): <b className="text-white">{summary.mann_kendall?.var_s}</b></div>
-                    <div>Z-Score: <b className="text-[#00D4FF]">{summary.mann_kendall?.z?.toFixed(3)}</b></div>
-                  </div>
-
-                  {/* Serial Autocorrelation Check */}
-                  <div className="bg-[#0D1B2A] p-3.5 rounded-xl border border-[#1E3A56] space-y-1 font-mono">
-                    <div className="text-slate-400 font-sans font-bold">Lag-1 Serial Correlation</div>
-                    <div>r₁ value: <b className={summary.autocorrelation?.is_significant ? 'text-amber-400' : 'text-white'}>
-                      {summary.autocorrelation?.lag1?.toFixed(4)}
-                    </b></div>
-                    <div>Critical threshold: <b className="text-slate-400">±{summary.autocorrelation?.critical_value?.toFixed(3)}</b></div>
-                    <div>Adjusted p-value: <b className="text-[#00D4FF]">{summary.autocorrelation?.adjusted_mk_p_value?.toFixed(5)}</b></div>
-                    <div className="text-[10px] text-slate-400 font-sans pt-1">
-                      {summary.autocorrelation?.explanation}
-                    </div>
-                  </div>
-
-                  {/* Pettitt Change-Point Test */}
-                  {summary.pettitt && (
-                    <div className="bg-[#0D1B2A] p-3.5 rounded-xl border border-[#1E3A56] space-y-1 font-mono col-span-1 md:col-span-2 lg:col-span-3">
-                      <div className="text-slate-400 font-sans font-bold flex items-center space-x-1.5">
-                        <span>Pettitt Change-Point Detection (Pettitt, 1979)</span>
-                        {summary.pettitt.is_significant && (
-                          <span className="px-2 py-0.2 rounded-full bg-amber-500/15 text-amber-400 text-[10px] border border-amber-500/30">
-                            Statistically Significant
-                          </span>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
-                        <div>Change-Point Date: <b className="text-[#00D4FF]">{summary.pettitt.change_point_date || 'None'}</b></div>
-                        <div>K-Statistic: <b className="text-white">{summary.pettitt.k_statistic}</b></div>
-                        <div>Change-Point p-value: <b className="text-white">{summary.pettitt.p_value}</b></div>
-                      </div>
-                    </div>
-                  )}
-
+          {/* Error Banner */}
+          {error && (
+            <div
+              className="p-4 rounded-[14px] border space-y-3 text-xs"
+              style={{
+                backgroundColor: 'var(--warm-soft)',
+                borderColor: 'var(--warm)',
+                color: 'var(--text)'
+              }}
+              role="alert"
+            >
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--warm)' }} />
+                <div>
+                  <h3 className="font-bold text-sm">Unable to complete statistical run</h3>
+                  <p className="text-[var(--muted)] mt-0.5">{error}</p>
                 </div>
               </div>
-            )}
-          </div>
-
-          {/* Secondary Charts: Annual Mean vs Seasonal Profile */}
-          <div className="space-y-3">
-            <div className="flex items-center space-x-2">
-              <button
-                type="button"
-                onClick={() => setSecondaryTab('yearly')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
-                  secondaryTab === 'yearly'
-                    ? 'bg-[#00D4FF] text-[#071426] border-[#00D4FF] font-bold'
-                    : 'bg-[#0D1B2A] text-slate-300 border-[#1E3A56] hover:text-white'
-                }`}
-              >
-                Annual Aggregates
-              </button>
-              <button
-                type="button"
-                onClick={() => setSecondaryTab('seasonal')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
-                  secondaryTab === 'seasonal'
-                    ? 'bg-[#00D4FF] text-[#071426] border-[#00D4FF] font-bold'
-                    : 'bg-[#0D1B2A] text-slate-300 border-[#1E3A56] hover:text-white'
-                }`}
-              >
-                Monthly Seasonal Profile
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => runAnalysis()}
+                  className="px-3 py-1.5 rounded-[10px] bg-[var(--accent)] text-[var(--accent-fg)] font-semibold inline-flex items-center gap-1.5"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Retry analysis</span>
+                </button>
+                <Link
+                  to="/cases"
+                  className="px-3 py-1.5 rounded-[10px] bg-[var(--panel)] border border-[var(--border)] text-[var(--text)] font-medium inline-flex items-center gap-1.5"
+                >
+                  <Compass className="w-3.5 h-3.5 text-[var(--accent)]" />
+                  <span>Open offline Detective Cases</span>
+                </Link>
+              </div>
             </div>
+          )}
 
-            {secondaryTab === 'yearly' ? (
-              <YearlyChart data={yearlyData} unit={summary.unit} />
-            ) : (
-              <SeasonalChart data={monthlyData} unit={summary.unit} />
+          {/* Skeleton Loading State when no analysisResult yet */}
+          {loading && !summary && (
+            <div className="space-y-4 animate-pulse">
+              <div className="h-80 rounded-[14px] bg-[var(--card)] border border-[var(--border)]" />
+              <div className="h-44 rounded-[14px] bg-[var(--card)] border border-[var(--border)]" />
+            </div>
+          )}
+
+          {/* Active Tab Panels */}
+          {summary && (
+            <div className="space-y-4">
+              {activeTab === 'timeseries' && (
+                <>
+                  <TimeSeriesChart
+                    data={timeSeriesData}
+                    variableName={summary.variable_name}
+                    unit={summary.unit}
+                    pettitt={summary.pettitt}
+                    headline={summary.headline}
+                    slopeDirection={summary.sens_slope_per_year}
+                    onDownloadCsv={() => {
+                      window.location.href = csvUrl;
+                    }}
+                  />
+                  <SeasonalFingerprint timeSeries={timeSeriesData} unit={summary.unit} />
+                </>
+              )}
+
+              {activeTab === 'seasonal' && (
+                <>
+                  <SeasonalChart data={monthlyData} unit={summary.unit} />
+                  <SeasonalFingerprint timeSeries={timeSeriesData} unit={summary.unit} />
+                </>
+              )}
+
+              {activeTab === 'yearly' && <YearlyChart data={yearlyData} unit={summary.unit} />}
+
+              {activeTab === 'anomaly' && (
+                <>
+                  <TimeSeriesChart
+                    data={timeSeriesData}
+                    variableName={summary.variable_name}
+                    unit={summary.unit}
+                    pettitt={summary.pettitt}
+                    headline="Deseasonalized departures relative to multi-year monthly climatology baseline."
+                    slopeDirection={summary.sens_slope_per_year}
+                    forceAnomaly={true}
+                    onDownloadCsv={() => {
+                      window.location.href = csvUrl;
+                    }}
+                  />
+                  <SeasonalFingerprint timeSeries={timeSeriesData} unit={summary.unit} />
+                </>
+              )}
+
+              {activeTab === 'export' && (
+                <div className="space-y-4">
+                  {/* Report & Data Downloads */}
+                  <div className="bg-[var(--card)] border border-[var(--border)] rounded-[14px] p-5 space-y-4">
+                    <div>
+                      <h3 className="text-sm font-bold text-[var(--text)]">Export &amp; Reproducibility</h3>
+                      <p className="text-xs text-[var(--muted)]">
+                        Download publication-grade PDF summaries, raw cleaned NASA time-series CSV, or share exact URL coordinates.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2.5">
+                      <a
+                        href={pdfUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-4 py-2 rounded-[10px] bg-[var(--accent)] text-[var(--accent-fg)] font-semibold text-xs inline-flex items-center gap-1.5"
+                      >
+                        <FileText className="w-4 h-4" />
+                        <span>Download PDF Report</span>
+                      </a>
+                      <a
+                        href={csvUrl}
+                        className="px-4 py-2 rounded-[10px] bg-[var(--panel)] border border-[var(--border)] text-[var(--text)] font-semibold text-xs inline-flex items-center gap-1.5 hover:border-[var(--accent)]"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Download CSV Data</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={copyShareableLink}
+                        className="px-4 py-2 rounded-[10px] bg-[var(--panel)] border border-[var(--border)] text-[var(--text)] font-semibold text-xs inline-flex items-center gap-1.5 hover:border-[var(--accent)]"
+                      >
+                        {copiedLink ? <Check className="w-4 h-4" style={{ color: 'var(--sig)' }} /> : <Share2 className="w-4 h-4" />}
+                        <span>{copiedLink ? 'Link Copied' : 'Copy Shareable URL'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Full Diagnostic Statistics Table */}
+                  <div className="bg-[var(--card)] border border-[var(--border)] rounded-[14px] p-5 space-y-4 text-xs">
+                    <div className="flex items-center gap-2 font-bold text-[var(--text)] pb-2 border-b border-[var(--border)]">
+                      <Activity className="w-4 h-4 text-[var(--accent)]" />
+                      <span>Full Non-Parametric &amp; Parametric Diagnostics</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono">
+                      <div className="p-3 rounded-[10px] bg-[var(--panel)] border border-[var(--border)] space-y-1">
+                        <div className="font-sans font-bold text-[var(--muted)]">OLS Regression</div>
+                        <div>Slope: <strong>{formatSigned(summary.linear_regression?.slope_per_year, 4)} {summary.unit}/yr</strong></div>
+                        <div>R²: <strong>{summary.linear_regression?.r_squared?.toFixed(4)}</strong></div>
+                        <div>p-value: <strong>{summary.linear_regression?.p_value?.toFixed(5)}</strong></div>
+                      </div>
+                      <div className="p-3 rounded-[10px] bg-[var(--panel)] border border-[var(--border)] space-y-1">
+                        <div className="font-sans font-bold text-[var(--muted)]">Mann-Kendall Test</div>
+                        <div>Kendall τ: <strong>{summary.mann_kendall?.tau?.toFixed(4)}</strong></div>
+                        <div>Z-score: <strong>{summary.mann_kendall?.z?.toFixed(3)}</strong></div>
+                        <div>Obs: <strong>{summary.observation_count} ({100 - summary.missing_percentage}% valid)</strong></div>
+                      </div>
+                      <div className="p-3 rounded-[10px] bg-[var(--panel)] border border-[var(--border)] space-y-1">
+                        <div className="font-sans font-bold text-[var(--muted)]">Autocorrelation &amp; Pettitt</div>
+                        <div>Lag-1 r₁: <strong>{summary.autocorrelation?.lag1?.toFixed(4) ?? '—'}</strong></div>
+                        <div>Adj. MK p: <strong>{summary.autocorrelation?.adjusted_mk_p_value?.toFixed(5) ?? '—'}</strong></div>
+                        <div>Change-pt: <strong>{summary.pettitt?.change_point_year || 'None'}</strong></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* RIGHT PANEL: Four Core Verdict Cards + Ask EarthPulse */}
+        <aside
+          aria-label="Scientific Verdict"
+          className="bg-[var(--panel)] border-t lg:border-t-0 lg:border-l border-[var(--border)] min-h-0 lg:h-full lg:overflow-y-auto p-4 space-y-3"
+        >
+          <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--muted)]">
+              Scientific Verdict
+            </h2>
+            {summary && (
+              <span className="text-[11px] font-mono text-[var(--muted)]">
+                {startYear}–{endYear}
+              </span>
             )}
           </div>
 
-          {/* 6. "Explain This" AI Assistant Section */}
-          <AskEarthPulseSection currentAnalysis={summary} />
+          {summary ? (
+            <div className="space-y-2.5">
+              {/* 1. WHAT */}
+              <VerdictCard
+                questionTag="01 · WHAT"
+                accentBarColor={whatDirection.color}
+                badge={
+                  <span className="text-[11px] font-mono text-[var(--muted)]">
+                    τ = {summary.mann_kendall?.tau?.toFixed(3) ?? '0.000'}
+                  </span>
+                }
+                headlineValue={
+                  <span className="inline-flex items-center gap-2" style={{ color: whatDirection.color }}>
+                    <TrendArrow
+                      value={summary.rate_per_decade}
+                      unit={`${summary.unit}/dec`}
+                      decimals={2}
+                      isSignificant={summary.is_significant}
+                      className="text-base"
+                    />
+                  </span>
+                }
+                detail={
+                  <span>
+                    <strong className="text-[var(--text)]">{whatDirection.word}</strong> in {activeVarMeta.short_name || activeVarMeta.name}.
+                  </span>
+                }
+              />
 
-        </div>
-      )}
+              {/* 2. WHERE */}
+              <VerdictCard
+                questionTag="02 · WHERE"
+                accentBarColor="var(--accent)"
+                title={`${latitude.toFixed(2)}°, ${longitude.toFixed(2)}°`}
+                headlineValue={<span className="text-base font-sans font-bold">{locationName}</span>}
+                detail={regionalComparisonText}
+              />
 
+              {/* 3. HOW MUCH */}
+              <VerdictCard
+                questionTag="03 · HOW MUCH"
+                accentBarColor={summary.rate_per_decade >= 0 ? 'var(--warm)' : 'var(--cool)'}
+                headlineValue={
+                  <span
+                    className="text-3xl font-extrabold tracking-tight font-mono"
+                    style={{
+                      color: !summary.is_significant
+                        ? 'var(--text)'
+                        : summary.rate_per_decade >= 0
+                        ? 'var(--warm)'
+                        : 'var(--cool)'
+                    }}
+                  >
+                    {formatSigned(summary.rate_per_decade, 2)}
+                  </span>
+                }
+                unit={`${summary.unit} / decade`}
+                detail={
+                  <span>
+                    Estimated total change over {endYear - startYear + 1} yrs:{' '}
+                    <strong className="font-mono text-[var(--text)]">
+                      {formatSigned(summary.total_change, 2)} {summary.unit}
+                    </strong>
+                  </span>
+                }
+              />
+
+              {/* 4. SIGNIFICANT? */}
+              <VerdictCard
+                questionTag="04 · SIGNIFICANT?"
+                accentBarColor={summary.is_significant ? 'var(--sig)' : 'var(--border)'}
+                badge={
+                  <SignificanceBadge
+                    isSignificant={summary.is_significant}
+                    pValue={effectivePValue}
+                    adjusted={isAutoAdjusted}
+                    statusLabel={significanceLabel}
+                  />
+                }
+                headlineValue={
+                  <span
+                    className="text-2xl font-extrabold tracking-tight"
+                    style={{ color: summary.is_significant ? 'var(--sig)' : 'var(--muted)' }}
+                  >
+                    {significanceLabel}
+                  </span>
+                }
+                detail={
+                  <span className="font-mono text-[11px]">
+                    p = {effectivePValue !== undefined ? effectivePValue.toFixed(5) : 'N/A'} · 95% confidence{' '}
+                    {isAutoAdjusted ? '(autocorrelation-adjusted)' : '(standard MK)'}
+                  </span>
+                }
+              />
+            </div>
+          ) : (
+            <div className="space-y-2.5 animate-pulse">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-24 rounded-[14px] bg-[var(--card)] border border-[var(--border)]" />
+              ))}
+            </div>
+          )}
+
+          {/* Ask EarthPulse AI Mini Chat */}
+          <div className="pt-2">
+            <AskEarthPulseSection currentAnalysis={summary} compact={true} />
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }

@@ -8,8 +8,8 @@ const satellitePinIcon = L.divIcon({
   className: 'earthpulse-satellite-pin',
   html: `
     <div style="position: relative; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; transform: translateY(-10px);">
-      <div style="width: 22px; height: 22px; border-radius: 50%; background: rgba(53, 208, 127, 0.3); border: 1.5px solid #35D07F; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(53, 208, 127, 0.6);">
-        <div style="width: 8px; height: 8px; border-radius: 50%; background: #35D07F; border: 2px solid #FFFFFF;"></div>
+      <div style="width: 22px; height: 22px; border-radius: 50%; background: rgba(156, 196, 90, 0.3); border: 1.5px solid #9cc45a; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(156, 196, 90, 0.6);">
+        <div style="width: 8px; height: 8px; border-radius: 50%; background: #9cc45a; border: 2px solid #FFFFFF;"></div>
       </div>
     </div>
   `,
@@ -94,14 +94,14 @@ export default memo(function NasaSatelliteView({
   return (
     <div className="flex flex-col h-full space-y-3">
       {/* Controls Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-[#0D1B2A] p-2.5 rounded-xl border border-[#1E3A56] text-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-[var(--panel)] p-2.5 rounded-xl border border-[var(--border)] text-xs">
         {/* Layer Selector */}
         <div className="flex items-center space-x-2">
-          <Layers className="w-4 h-4 text-[#00D4FF] shrink-0" />
+          <Layers className="w-4 h-4 text-[var(--accent)] shrink-0" />
           <select
             value={selectedLayer}
             onChange={(e) => setSelectedLayer(e.target.value)}
-            className="flex-1 bg-[#13263A] border border-[#1E3A56] rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-[#00D4FF]"
+            className="flex-1 bg-[var(--card)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-[var(--accent)]"
           >
             {GIBS_LAYERS.map((layer) => (
               <option key={layer.id} value={layer.id}>
@@ -113,13 +113,13 @@ export default memo(function NasaSatelliteView({
 
         {/* Date Picker */}
         <div className="flex items-center space-x-2">
-          <Calendar className="w-4 h-4 text-[#35D07F] shrink-0" />
+          <Calendar className="w-4 h-4 text-[var(--sig)] shrink-0" />
           <input
             type="date"
             value={satelliteDate}
             max={getLatestAvailableDateStr()}
             onChange={(e) => setSatelliteDate(e.target.value)}
-            className="flex-1 bg-[#13263A] border border-[#1E3A56] rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-[#00D4FF]"
+            className="flex-1 bg-[var(--card)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-[var(--accent)]"
           />
         </div>
 
@@ -136,13 +136,13 @@ export default memo(function NasaSatelliteView({
             step="0.05"
             value={opacity}
             onChange={(e) => setOpacity(parseFloat(e.target.value))}
-            className="flex-1 accent-[#00D4FF]"
+            className="flex-1 accent-[#d9b64c]"
           />
         </div>
       </div>
 
       {/* Map Container */}
-      <div className="flex-1 w-full min-h-[420px] rounded-xl overflow-hidden border border-[#1E3A56] relative">
+      <div className="flex-1 w-full min-h-[420px] rounded-xl overflow-hidden border border-[var(--border)] relative">
         <MapContainer
           key="earthpulse-nasa-satellite-map"
           center={[latitude, longitude]}
@@ -175,8 +175,8 @@ export default memo(function NasaSatelliteView({
         </MapContainer>
 
         {/* GIBS Badge */}
-        <div className="absolute top-2.5 right-2.5 z-[1000] bg-[#071426]/90 border border-[#1E3A56] px-3 py-1.5 rounded-lg text-[11px] text-slate-300 flex items-center space-x-2">
-          <span className="w-2 h-2 rounded-full bg-[#35D07F] animate-pulse"></span>
+        <div className="absolute top-2.5 right-2.5 z-[1000] bg-[var(--bg)]/90 border border-[var(--border)] px-3 py-1.5 rounded-lg text-[11px] text-slate-300 flex items-center space-x-2">
+          <span className="w-2 h-2 rounded-full bg-[var(--sig)] animate-pulse"></span>
           <span className="font-semibold text-white">NASA GIBS WMTS Live</span>
           <span className="text-slate-400 font-mono">({satelliteDate})</span>
         </div>
@@ -189,8 +189,8 @@ export default memo(function NasaSatelliteView({
         )}
 
         {/* Bottom Location Indicator */}
-        <div className="absolute bottom-2.5 left-2.5 z-[1000] bg-[#071426]/90 border border-[#1E3A56] px-3 py-1 rounded-lg text-[11px] text-slate-300 flex items-center space-x-1.5 pointer-events-none">
-          <MapPin className="w-3.5 h-3.5 text-[#35D07F]" />
+        <div className="absolute bottom-2.5 left-2.5 z-[1000] bg-[var(--bg)]/90 border border-[var(--border)] px-3 py-1 rounded-lg text-[11px] text-slate-300 flex items-center space-x-1.5 pointer-events-none">
+          <MapPin className="w-3.5 h-3.5 text-[var(--sig)]" />
           <span>Click to select location on NASA imagery &bull; Max GIBS Zoom: Level 9</span>
         </div>
       </div>

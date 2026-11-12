@@ -38,22 +38,22 @@ export default function MetricCard({ summary }) {
   // Determine Badge Styling
   const badgeColors = {
     green: {
-      bg: 'bg-[#35D07F]/15 border-[#35D07F]/40 text-[#35D07F]',
-      badge: 'bg-[#35D07F] text-[#071426]',
+      bg: 'bg-[var(--sig)]/15 border-[var(--sig)]/40 text-[var(--sig)]',
+      badge: 'bg-[var(--sig)] text-[var(--accent-fg)]',
       icon: TrendingUp,
       title: 'Statistically Significant Increase',
       pulse: 'shadow-[0_0_20px_rgba(53,208,127,0.25)]'
     },
     red: {
-      bg: 'bg-[#FF4D4D]/15 border-[#FF4D4D]/40 text-[#FF4D4D]',
-      badge: 'bg-[#FF4D4D] text-white',
+      bg: 'bg-[var(--warm)]/15 border-[var(--warm)]/40 text-[var(--warm)]',
+      badge: 'bg-[var(--warm)] text-white',
       icon: TrendingDown,
       title: 'Statistically Significant Decrease',
       pulse: 'shadow-[0_0_20px_rgba(255,77,77,0.25)]'
     },
     grey: {
-      bg: 'bg-[#9BAEC2]/10 border-[#9BAEC2]/30 text-[#9BAEC2]',
-      badge: 'bg-[#9BAEC2]/30 text-[#9BAEC2]',
+      bg: 'bg-[#9BAEC2]/10 border-[#9BAEC2]/30 text-[var(--muted)]',
+      badge: 'bg-[#9BAEC2]/30 text-[var(--muted)]',
       icon: Minus,
       title: 'No Statistically Significant Trend',
       pulse: ''
@@ -85,7 +85,7 @@ export default function MetricCard({ summary }) {
       <div className={`rounded-xl border p-4 sm:p-5 transition-all ${statusConfig.bg} ${statusConfig.pulse}`}>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-[#071426]/70 border border-current">
+            <div className="p-3 rounded-xl bg-[var(--bg)]/70 border border-current">
               <StatusIcon className="w-6 h-6 stroke-[2.5]" />
             </div>
             <div>
@@ -120,57 +120,57 @@ export default function MetricCard({ summary }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         
         {/* Card 1: Sen's Slope */}
-        <div className="bg-[#13263A] border border-[#1E3A56] rounded-xl p-3.5 shadow-md">
-          <div className="text-[11px] text-[#9BAEC2] flex items-center justify-between mb-1">
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3.5 shadow-md">
+          <div className="text-[11px] text-[var(--muted)] flex items-center justify-between mb-1">
             <span>Sen's Slope Estimator</span>
-            <span className="text-[#00D4FF] font-mono text-[10px]">Non-parametric</span>
+            <span className="text-[var(--accent)] font-mono text-[10px]">Non-parametric</span>
           </div>
           <div className="text-xl font-bold text-white font-mono">
             {sens_slope_per_year > 0 ? `+${sens_slope_per_year}` : sens_slope_per_year}
           </div>
-          <p className="text-[10px] text-[#9BAEC2] mt-1">
+          <p className="text-[10px] text-[var(--muted)] mt-1">
             Median pairwise slope; robust against outliers and gaps.
           </p>
         </div>
 
         {/* Card 2: Mann-Kendall P-Value */}
-        <div className="bg-[#13263A] border border-[#1E3A56] rounded-xl p-3.5 shadow-md">
-          <div className="text-[11px] text-[#9BAEC2] flex items-center justify-between mb-1">
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3.5 shadow-md">
+          <div className="text-[11px] text-[var(--muted)] flex items-center justify-between mb-1">
             <span>Mann-Kendall P-Value</span>
             <span className="font-mono text-[10px] text-emerald-400">α = 0.05</span>
           </div>
           <div className="text-xl font-bold text-white font-mono">
             {mann_kendall.p_value}
           </div>
-          <p className="text-[10px] text-[#9BAEC2] mt-1">
+          <p className="text-[10px] text-[var(--muted)] mt-1">
             {is_significant ? 'Statistically significant (p < 0.05)' : 'Not significant (p ≥ 0.05)'}
           </p>
         </div>
 
         {/* Card 3: Linear Regression Slope & R² */}
-        <div className="bg-[#13263A] border border-[#1E3A56] rounded-xl p-3.5 shadow-md">
-          <div className="text-[11px] text-[#9BAEC2] flex items-center justify-between mb-1">
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3.5 shadow-md">
+          <div className="text-[11px] text-[var(--muted)] flex items-center justify-between mb-1">
             <span>OLS Regression</span>
-            <span className="text-[#00D4FF] font-mono text-[10px]">R² = {linear_regression.r_squared}</span>
+            <span className="text-[var(--accent)] font-mono text-[10px]">R² = {linear_regression.r_squared}</span>
           </div>
           <div className="text-xl font-bold text-white font-mono">
             {linear_regression.slope_per_year > 0 ? `+${linear_regression.slope_per_year}` : linear_regression.slope_per_year}
           </div>
-          <p className="text-[10px] text-[#9BAEC2] mt-1">
+          <p className="text-[10px] text-[var(--muted)] mt-1">
             Std Err: ±{linear_regression.std_err} {unit}
           </p>
         </div>
 
         {/* Card 4: Observations & Quality */}
-        <div className="bg-[#13263A] border border-[#1E3A56] rounded-xl p-3.5 shadow-md">
-          <div className="text-[11px] text-[#9BAEC2] flex items-center justify-between mb-1">
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3.5 shadow-md">
+          <div className="text-[11px] text-[var(--muted)] flex items-center justify-between mb-1">
             <span>Data Observations</span>
-            <span className="text-[#35D07F] font-mono text-[10px]">{100 - missing_percentage}% Valid</span>
+            <span className="text-[var(--sig)] font-mono text-[10px]">{100 - missing_percentage}% Valid</span>
           </div>
           <div className="text-xl font-bold text-white font-mono">
-            {observation_count} <span className="text-xs text-[#9BAEC2] font-normal">points</span>
+            {observation_count} <span className="text-xs text-[var(--muted)] font-normal">points</span>
           </div>
-          <p className="text-[10px] text-[#9BAEC2] mt-1">
+          <p className="text-[10px] text-[var(--muted)] mt-1">
             Missing: {missing_percentage}% of record
           </p>
         </div>
@@ -178,28 +178,28 @@ export default function MetricCard({ summary }) {
       </div>
 
       {/* Advanced Statistical Metrics Table */}
-      <div className="bg-[#13263A] rounded-xl border border-[#1E3A56] p-4 text-xs space-y-2">
-        <h4 className="font-semibold text-white flex items-center gap-1.5 pb-2 border-b border-[#1E3A56]">
-          <Activity className="w-4 h-4 text-[#00D4FF]" />
+      <div className="bg-[var(--card)] rounded-xl border border-[var(--border)] p-4 text-xs space-y-2">
+        <h4 className="font-semibold text-white flex items-center gap-1.5 pb-2 border-b border-[var(--border)]">
+          <Activity className="w-4 h-4 text-[var(--accent)]" />
           <span>Advanced Test Metrics</span>
         </h4>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
           <div>
-            <span className="text-[#9BAEC2] block text-[10px]">Kendall's Tau (τ):</span>
+            <span className="text-[var(--muted)] block text-[10px]">Kendall's Tau (τ):</span>
             <span className="font-mono font-bold text-white text-sm">{mann_kendall.tau}</span>
           </div>
           <div>
-            <span className="text-[#9BAEC2] block text-[10px]">MK Z-Statistic:</span>
+            <span className="text-[var(--muted)] block text-[10px]">MK Z-Statistic:</span>
             <span className="font-mono font-bold text-white text-sm">{mann_kendall.z}</span>
           </div>
           <div>
-            <span className="text-[#9BAEC2] block text-[10px]">95% CI for Slope:</span>
+            <span className="text-[var(--muted)] block text-[10px]">95% CI for Slope:</span>
             <span className="font-mono font-bold text-white text-xs truncate block">
               [{linear_regression.ci_95_lower}, {linear_regression.ci_95_upper}]
             </span>
           </div>
           <div>
-            <span className="text-[#9BAEC2] block text-[10px]">Seasonal MK (m=12):</span>
+            <span className="text-[var(--muted)] block text-[10px]">Seasonal MK (m=12):</span>
             <span className="font-mono font-bold text-white text-xs">
               {seasonal_mann_kendall ? `p = ${seasonal_mann_kendall.p_value}` : 'N/A (Daily/Short)'}
             </span>

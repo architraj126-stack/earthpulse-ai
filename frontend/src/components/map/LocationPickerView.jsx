@@ -13,8 +13,8 @@ const locationIcon = L.divIcon({
   className: 'earthpulse-map-pin',
   html: `
     <div style="position: relative; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; transform: translateY(-10px);">
-      <div style="width: 24px; height: 24px; border-radius: 50%; background: rgba(0, 212, 255, 0.25); border: 1.5px solid #00D4FF; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 12px rgba(0, 212, 255, 0.5);">
-        <div style="width: 10px; height: 10px; border-radius: 50%; background: #00D4FF; border: 2px solid #FFFFFF;"></div>
+      <div style="width: 24px; height: 24px; border-radius: 50%; background: rgba(217, 182, 76, 0.25); border: 1.5px solid #d9b64c; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 12px rgba(217, 182, 76, 0.5);">
+        <div style="width: 10px; height: 10px; border-radius: 50%; background: #d9b64c; border: 2px solid #FFFFFF;"></div>
       </div>
     </div>
   `,
@@ -154,30 +154,30 @@ export default memo(function LocationPickerView({
   return (
     <div className="flex flex-col h-full space-y-3">
       {/* Top Search & Coordinates Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 bg-[#0D1B2A] p-2.5 rounded-xl border border-[#1E3A56]">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 bg-[var(--panel)] p-2.5 rounded-xl border border-[var(--border)]">
         <form onSubmit={handleSearchSubmit} className="relative flex-1">
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search city, country or landmark..."
-            className="w-full bg-[#13263A] border border-[#1E3A56] rounded-lg pl-9 pr-24 py-1.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#00D4FF]"
+            className="w-full bg-[var(--card)] border border-[var(--border)] rounded-lg pl-9 pr-24 py-1.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[var(--accent)]"
           />
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
           <button
             type="submit"
             disabled={isSearching}
-            className="absolute right-1.5 top-1 px-3 py-1 bg-[#00D4FF]/20 hover:bg-[#00D4FF]/30 text-[#00D4FF] border border-[#00D4FF]/40 rounded text-xs font-semibold flex items-center space-x-1"
+            className="absolute right-1.5 top-1 px-3 py-1 bg-[var(--accent)]/20 hover:bg-[var(--accent)]/30 text-[var(--accent)] border border-[var(--accent)]/40 rounded text-xs font-semibold flex items-center space-x-1"
           >
             {isSearching ? <Loader2 className="w-3 h-3 animate-spin" /> : <span>Search</span>}
           </button>
         </form>
 
-        <div className="flex items-center space-x-2 text-xs font-mono text-slate-300 bg-[#13263A] px-3 py-1.5 rounded-lg border border-[#1E3A56]/60">
-          <MapPin className="w-3.5 h-3.5 text-[#00D4FF] shrink-0" />
+        <div className="flex items-center space-x-2 text-xs font-mono text-slate-300 bg-[var(--card)] px-3 py-1.5 rounded-lg border border-[var(--border)]/60">
+          <MapPin className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
           <span className="truncate max-w-[200px]" title={name}>{name}</span>
-          <span className="text-[#00D4FF]">({latitude.toFixed(2)}°, {longitude.toFixed(2)}°)</span>
-          {isGeocoding && <Loader2 className="w-3 h-3 animate-spin text-[#00D4FF] shrink-0" />}
+          <span className="text-[var(--accent)]">({latitude.toFixed(2)}°, {longitude.toFixed(2)}°)</span>
+          {isGeocoding && <Loader2 className="w-3 h-3 animate-spin text-[var(--accent)] shrink-0" />}
         </div>
       </div>
 
@@ -193,8 +193,8 @@ export default memo(function LocationPickerView({
               onClick={() => onLocationChange(spot.name, spot.lat, spot.lon)}
               className={`shrink-0 px-2.5 py-1 rounded-full border transition-all text-xs flex items-center space-x-1.5 ${
                 isSelected
-                  ? 'bg-[#00D4FF]/20 text-[#00D4FF] border-[#00D4FF] font-semibold'
-                  : 'bg-[#13263A]/80 text-slate-300 border-[#1E3A56] hover:border-[#00D4FF]/50 hover:text-white'
+                  ? 'bg-[var(--accent)]/20 text-[var(--accent)] border-[var(--accent)] font-semibold'
+                  : 'bg-[var(--card)]/80 text-slate-300 border-[var(--border)] hover:border-[var(--accent)]/50 hover:text-white'
               }`}
             >
               <span>{spot.name}</span>
@@ -204,7 +204,7 @@ export default memo(function LocationPickerView({
       </div>
 
       {/* Clean Leaflet Map Container */}
-      <div className="flex-1 w-full min-h-[420px] rounded-xl overflow-hidden border border-[#1E3A56] relative">
+      <div className="flex-1 w-full min-h-[420px] rounded-xl overflow-hidden border border-[var(--border)] relative">
         <MapContainer
           key="earthpulse-location-picker-map"
           center={[latitude, longitude]}
@@ -222,8 +222,8 @@ export default memo(function LocationPickerView({
         </MapContainer>
 
         {/* Click instructions banner */}
-        <div className="absolute bottom-2.5 left-2.5 z-[1000] bg-[#071426]/90 border border-[#1E3A56] px-3 py-1 rounded-lg text-[11px] text-slate-300 flex items-center space-x-1.5 pointer-events-none">
-          <Compass className="w-3.5 h-3.5 text-[#00D4FF]" />
+        <div className="absolute bottom-2.5 left-2.5 z-[1000] bg-[var(--bg)]/90 border border-[var(--border)] px-3 py-1 rounded-lg text-[11px] text-slate-300 flex items-center space-x-1.5 pointer-events-none">
+          <Compass className="w-3.5 h-3.5 text-[var(--accent)]" />
           <span>Click anywhere to drop pin &bull; Pin appears &lt;50ms</span>
         </div>
       </div>

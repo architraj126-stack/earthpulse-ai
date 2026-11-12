@@ -8,49 +8,51 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ReferenceLine
 } from 'recharts';
-import { Download, TrendingUp, Sliders, Eye, EyeOff, Flag, Image as ImageIcon } from 'lucide-react';
+import { Download, TrendingUp, Sliders, Flag, Image as ImageIcon } from 'lucide-react';
 import { downsampleLTTB } from '../utils/lttb';
+import { useTheme } from '../theme/ThemeContext';
 
-const CustomTooltip = memo(({ active, payload, label, unit, isAnomalyMode }) => {
+const CustomTooltip = memo(({ active, payload, label, unit, isAnomalyMode, colors }) => {
   if (active && payload && payload.length) {
-    const obsVal = payload.find(p => p.dataKey === 'display_value')?.value;
-    const rollingVal = payload.find(p => p.dataKey === 'rolling_mean_12m')?.value;
-    const trendVal = payload.find(p => p.dataKey === 'trend_value')?.value;
-    const ciUpper = payload.find(p => p.dataKey === 'ci_upper')?.value;
-    const ciLower = payload.find(p => p.dataKey === 'ci_lower')?.value;
+    const obsVal = payload.find((p) => p.dataKey === 'display_value')?.value;
+    const rollingVal = payload.find((p) => p.dataKey === 'rolling_mean_12m')?.value;
+    const trendVal = payload.find((p) => p.dataKey === 'trend_value')?.value;
+    const rawPt = payload[0]?.payload;
 
     return (
-      <div className="bg-[#071426] border border-[#1E3A56] p-3 rounded-xl shadow-2xl text-xs space-y-1.5 z-50">
-        <div className="font-semibold text-white border-b border-[#1E3A56] pb-1 font-mono">
+      <div
+        className="bg-[var(--card)] border border-[var(--border)] p-3 rounded-[12px] text-xs space-y-1.5 z-50"
+        style={{ boxShadow: '0 8px 24px rgba(0, 0, 0, 0.18)' }}
+      >
+        <div className="font-semibold text-[var(--text)] border-b border-[var(--border)] pb-1 font-mono">
           {label}
         </div>
         {obsVal !== undefined && obsVal !== null ? (
-          <div className="flex items-center justify-between gap-4 text-slate-300">
-            <span>{isAnomalyMode ? 'Monthly Anomaly:' : 'Raw Monthly Obs:'}</span>
+          <div className="flex items-center justify-between gap-4 text-[var(--text)]">
+            <span className="text-[var(--muted)]">{isAnomalyMode ? 'Monthly anomaly:' : 'Observed:'}</span>
             <span className="font-mono font-semibold">{obsVal} {unit}</span>
           </div>
         ) : (
-          <div className="text-slate-400 italic">No observation</div>
+          <div className="text-[var(--muted)] italic">No observation</div>
         )}
         {rollingVal !== undefined && rollingVal !== null && !isAnomalyMode && (
-          <div className="flex items-center justify-between gap-4 text-[#00D4FF]">
-            <span>12-Mo Rolling Mean:</span>
+          <div className="flex items-center justify-between gap-4" style={{ color: colors.rolling }}>
+            <span>12-mo rolling mean:</span>
             <span className="font-mono font-bold">{rollingVal} {unit}</span>
           </div>
         )}
         {trendVal !== undefined && trendVal !== null && !isAnomalyMode && (
-          <div className="flex items-center justify-between gap-4 text-[#35D07F]">
-            <span>Calculated Sen\'s Trend:</span>
+          <div className="flex items-center justify-between gap-4" style={{ color: colors.accent }}>
+            <span>Sen&apos;s trend fit:</span>
             <span className="font-mono font-semibold">{trendVal} {unit}</span>
           </div>
         )}
-        {ciLower !== undefined && ciUpper !== undefined && (
-          <div className="flex items-center justify-between gap-4 text-emerald-400/80 text-[11px]">
-            <span>95% Confidence Band:</span>
-            <span className="font-mono">[{ciLower}, {ciUpper}]</span>
+        {rawPt?.ci_lower !== undefined && rawPt?.ci_upper !== undefined && rawPt?.ci_lower !== null && (
+          <div className="flex items-center justify-between gap-4 text-[var(--muted)] text-[11px]">
+            <span>95% CI:</span>
+            <span className="font-mono">[{rawPt.ci_lower}, {rawPt.ci_upper}]</span>
           </div>
         )}
       </div>
@@ -65,13 +67,18 @@ export default memo(function TimeSeriesChart({
   unit = '',
   pettitt = null,
   headline = '',
-  onDownloadCsv
+  slopeDirection = 1,
+  forceAnomaly = false,
+  onDownloadCsv,
+  compact = false
 }) {
+  const { colors } = useTheme();
   const [removeSeasonality, setRemoveSeasonality] = useState(false);
   const [yearWindowStart, setYearWindowStart] = useState(null);
   const chartContainerRef = useRef(null);
 
-  // Compute available min and max years
+  const isAnomalyMode = forceAnomaly || removeSeasonality;
+
   const { minYear, maxYear } = useMemo(() => {
     if (!data || data.length === 0) return { minYear: 1990, maxYear: 2023 };
     const firstYear = parseInt(data[0].date?.slice(0, 4) || '1990', 10);
@@ -81,10 +88,9 @@ export default memo(function TimeSeriesChart({
 
   const activeStartYear = yearWindowStart !== null ? yearWindowStart : minYear;
 
-  // Filter window + prepare plotted fields including 12-month rolling mean
   const processedData = useMemo(() => {
     if (!data || data.length === 0) return [];
-    
+
     let filtered = data;
     if (activeStartYear > minYear) {
       filtered = data.filter((d) => {
@@ -93,33 +99,39 @@ export default memo(function TimeSeriesChart({
       });
     }
 
-    // Assign display_value and compute rolling 12m mean
     const windowVals = [];
     const withRolling = filtered.map((d) => {
-      const v = removeSeasonality ? (d.anomaly_value ?? d.value) : d.value;
-      if (v !== null && v !== undefined && !isNaN(v)) {
+      const v = isAnomalyMode ? (d.anomaly_value ?? d.value) : d.value;
+      if (v !== null && v !== undefined && !Number.isNaN(v)) {
         windowVals.push(v);
-        if (windowVals.length > 12) {
-          windowVals.shift();
-        }
+        if (windowVals.length > 12) windowVals.shift();
       }
-      const rollingMean = windowVals.length >= 6
-        ? Math.round((windowVals.reduce((a, b) => a + b, 0) / windowVals.length) * 100) / 100
-        : null;
+      const rollingMean =
+        windowVals.length >= 6
+          ? Math.round((windowVals.reduce((a, b) => a + b, 0) / windowVals.length) * 100) / 100
+          : null;
+
+      const hasCi =
+        d.ci_lower !== null &&
+        d.ci_lower !== undefined &&
+        d.ci_upper !== null &&
+        d.ci_upper !== undefined;
 
       return {
         ...d,
         display_value: v,
-        rolling_mean_12m: rollingMean
+        rolling_mean_12m: rollingMean,
+        ci_band: hasCi ? [d.ci_lower, d.ci_upper] : null
       };
     });
 
-    // Downsample if over 1000 points to keep 60fps rendering
     if (withRolling.length > 1000) {
       return downsampleLTTB(withRolling, 1000);
     }
     return withRolling;
-  }, [data, activeStartYear, minYear, removeSeasonality]);
+  }, [data, activeStartYear, minYear, isAnomalyMode]);
+
+  const trendStroke = slopeDirection >= 0 ? colors.warm : colors.cool;
 
   const handleDownloadPng = () => {
     if (!chartContainerRef.current) return;
@@ -132,8 +144,8 @@ export default memo(function TimeSeriesChart({
       const ctx = canvas.getContext('2d');
       const img = new Image();
       const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-      const URL = window.URL || window.webkitURL || window;
-      const blobURL = URL.createObjectURL(svgBlob);
+      const URLObj = window.URL || window.webkitURL || window;
+      const blobURL = URLObj.createObjectURL(svgBlob);
 
       img.onload = () => {
         const width = chartSvg.clientWidth * 2 || 1600;
@@ -141,247 +153,200 @@ export default memo(function TimeSeriesChart({
         canvas.width = width;
         canvas.height = height;
 
-        // Dark theme background fill
-        ctx.fillStyle = '#0D1B2A';
+        ctx.fillStyle = colors.card || '#1e2318';
         ctx.fillRect(0, 0, width, height);
-
-        // Draw SVG
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Watermark
-        ctx.font = 'bold 20px monospace';
-        ctx.fillStyle = '#9BAEC2';
-        ctx.fillText('EarthPulse AI \u2022 NASA POWER Climate Analysis', 40, height - 30);
+        ctx.font = 'bold 18px monospace';
+        ctx.fillStyle = colors.muted || '#a7a28d';
+        ctx.fillText(`EarthPulse AI · ${variableName} (${unit})`, 36, height - 24);
 
         const pngUrl = canvas.toDataURL('image/png');
         const link = document.createElement('a');
         link.href = pngUrl;
-        link.download = `earthpulse_${variableName.toLowerCase().replace(/\\s+/g, '_')}_timeseries.png`;
+        link.download = `earthpulse_${variableName.toLowerCase().replace(/\s+/g, '_')}.png`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        URL.revokeObjectURL(blobURL);
+        URLObj.revokeObjectURL(blobURL);
       };
       img.src = blobURL;
     } catch {
-      // Fallback if SVG serializing is blocked
       window.print();
     }
   };
 
   if (!data || data.length === 0) {
     return (
-      <div className="bg-[#13263A] rounded-2xl border border-[#1E3A56] p-8 text-center text-slate-400 flex flex-col items-center justify-center h-80">
-        <TrendingUp className="w-12 h-12 text-[#1E3A56] mb-3 animate-pulse" />
-        <p className="text-sm">No time-series data available. Select a location and run trend analysis.</p>
+      <div className="bg-[var(--card)] rounded-[14px] border border-[var(--border)] p-8 text-center text-[var(--muted)] flex flex-col items-center justify-center h-72">
+        <TrendingUp className="w-10 h-10 mb-2 opacity-40" aria-hidden="true" />
+        <p className="text-sm">No time-series observations available. Run an analysis to visualize records.</p>
       </div>
     );
   }
 
-  const formatXAxis = (tickItem) => {
-    if (!tickItem) return '';
-    return tickItem.slice(0, 7);
-  };
+  const formatXAxis = (tickItem) => (tickItem ? tickItem.slice(0, 4) : '');
 
   return (
-    <div ref={chartContainerRef} className="bg-[#13263A] rounded-2xl border border-[#1E3A56] p-4 sm:p-5 shadow-xl space-y-4">
-      {/* Dynamic Finding Headline */}
-      {headline && (
-        <div className="bg-[#0D1B2A] border-l-4 border-[#00D4FF] px-4 py-2.5 rounded-r-xl">
-          <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold block">Scientific Finding</span>
-          <p className="text-xs sm:text-sm font-semibold text-white leading-relaxed">{headline}</p>
-        </div>
-      )}
-
-      {/* Chart Toolbar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-[#1E3A56]">
-        <div>
-          <h3 className="text-sm sm:text-base font-bold text-white font-heading flex items-center gap-2">
-            <span>{removeSeasonality ? 'Monthly Anomaly Time-Series (Deseasonalized)' : 'NASA Satellite Observations & Climatological Trend'}</span>
+    <div
+      ref={chartContainerRef}
+      className="bg-[var(--card)] rounded-[14px] border border-[var(--border)] p-4 sm:p-5 space-y-3"
+    >
+      {/* Headline & Actions Toolbar */}
+      <div className="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-[var(--border)]">
+        <div className="space-y-0.5 max-w-2xl">
+          <h3 className="text-sm font-bold text-[var(--text)]">
+            {isAnomalyMode ? 'Monthly Departures from Climatology (Anomaly)' : 'Observed Series & Non-Parametric Trend'}
           </h3>
-          <p className="text-xs text-slate-400">
-            {removeSeasonality
-              ? 'Seasonal cycle removed: showing deviations from multi-year monthly climatology baseline.'
-              : "Thin line: Monthly observations \u2022 Bold cyan: 12-Month rolling mean \u2022 Dashed emerald: Sen's slope trendline \u2022 Band: 95% CI."}
-          </p>
+          {headline && <p className="text-xs text-[var(--muted)] leading-relaxed">{headline}</p>}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Download PNG Chart */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {!forceAnomaly && (
+            <button
+              type="button"
+              onClick={() => setRemoveSeasonality((prev) => !prev)}
+              aria-pressed={removeSeasonality}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                removeSeasonality
+                  ? 'bg-[var(--accent)] text-[var(--accent-fg)] border-[var(--accent)] font-semibold'
+                  : 'bg-[var(--panel)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--text)]'
+              }`}
+            >
+              {removeSeasonality ? 'Anomaly View' : 'Deseasonalize'}
+            </button>
+          )}
           <button
             type="button"
             onClick={handleDownloadPng}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#0D1B2A] hover:bg-[#1E3A56] text-xs text-slate-300 hover:text-white border border-[#1E3A56] transition"
-            title="Download publication-quality PNG chart"
+            aria-label="Download chart as PNG image"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--panel)] border border-[var(--border)] text-xs text-[var(--muted)] hover:text-[var(--text)] transition-colors"
           >
-            <ImageIcon className="w-3.5 h-3.5 text-[#00D4FF]" />
-            <span>Download PNG</span>
+            <ImageIcon className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>PNG</span>
           </button>
-
-          {/* Remove Seasonal Cycle Toggle */}
-          <button
-            type="button"
-            onClick={() => setRemoveSeasonality(!removeSeasonality)}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
-              removeSeasonality
-                ? 'bg-[#00D4FF]/20 text-[#00D4FF] border-[#00D4FF]'
-                : 'bg-[#0D1B2A] text-slate-300 border-[#1E3A56] hover:text-white hover:border-slate-500'
-            }`}
-            title="Toggle deseasonalized anomaly series"
-          >
-            {removeSeasonality ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-            <span>{removeSeasonality ? 'Deseasonalized On' : 'Remove Seasonal Cycle'}</span>
-          </button>
-
-          {/* Export CSV */}
           {onDownloadCsv && (
             <button
+              type="button"
               onClick={onDownloadCsv}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#0D1B2A] hover:bg-[#1E3A56] text-xs text-[#00D4FF] border border-[#1E3A56] transition"
+              aria-label="Export observations as CSV"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--panel)] border border-[var(--border)] text-xs text-[var(--muted)] hover:text-[var(--text)] transition-colors"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>Export CSV</span>
+              <Download className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>CSV</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* "What if we had more years?" Interactive Window Slider */}
-      {maxYear - minYear > 6 && (
-        <div className="flex items-center space-x-3 bg-[#0D1B2A] px-3.5 py-2 rounded-xl border border-[#1E3A56] text-xs">
-          <Sliders className="w-4 h-4 text-[#00D4FF] shrink-0" />
-          <span className="text-slate-300 shrink-0 font-medium">What if we had more years?</span>
-          <span className="text-slate-400 font-mono text-[11px] shrink-0">Start Year: {activeStartYear}</span>
-          <input
-            type="range"
-            min={minYear}
-            max={maxYear - 5}
-            value={activeStartYear}
-            onChange={(e) => setYearWindowStart(parseInt(e.target.value, 10))}
-            className="flex-1 accent-[#00D4FF] h-1.5 bg-[#13263A] rounded-lg cursor-pointer"
-          />
-          {activeStartYear !== minYear && (
-            <button
-              type="button"
-              onClick={() => setYearWindowStart(minYear)}
-              className="text-[11px] text-[#00D4FF] hover:underline shrink-0"
-            >
-              Reset
-            </button>
-          )}
-        </div>
-      )}
-
       {/* Main Chart */}
-      <div className="h-80 sm:h-96 w-full pt-1">
+      <div className={compact ? 'h-64 w-full' : 'h-72 sm:h-80 w-full'}>
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={processedData} margin={{ top: 10, right: 20, left: 5, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1E3A56" vertical={false} />
+          <ComposedChart data={processedData} margin={{ top: 14, right: 18, left: 4, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} vertical={false} />
             <XAxis
               dataKey="date"
-              stroke="#9BAEC2"
+              stroke={colors.muted}
               fontSize={11}
               tickFormatter={formatXAxis}
-              minTickGap={45}
-              tickLine={{ stroke: '#1E3A56' }}
+              minTickGap={42}
+              tickLine={{ stroke: colors.border }}
+              axisLine={{ stroke: colors.border }}
             />
             <YAxis
-              stroke="#9BAEC2"
+              stroke={colors.muted}
               fontSize={11}
               domain={['auto', 'auto']}
-              label={{ value: `${variableName} (${unit})`, angle: -90, position: 'insideLeft', fill: '#9BAEC2', fontSize: 11, dy: 40 }}
-              tickLine={{ stroke: '#1E3A56' }}
+              width={52}
+              tickFormatter={(val) => `${val}`}
+              label={{
+                value: unit,
+                angle: -90,
+                position: 'insideLeft',
+                fill: colors.muted,
+                fontSize: 11,
+                dy: 10
+              }}
+              tickLine={{ stroke: colors.border }}
+              axisLine={{ stroke: colors.border }}
             />
-            <Tooltip content={<CustomTooltip unit={unit} isAnomalyMode={removeSeasonality} />} />
-            <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} iconType="circle" />
-
-            {/* Zero line in anomaly mode */}
-            {removeSeasonality && (
-              <ReferenceLine y={0} stroke="#9BAEC2" strokeDasharray="2 2" strokeWidth={1.2} />
-            )}
-
-            {/* Pettitt Change-Point Marker */}
-            {pettitt?.change_point_date && (
-              <ReferenceLine
-                x={pettitt.change_point_date}
-                stroke="#F59E0B"
-                strokeWidth={1.8}
-                strokeDasharray="4 4"
-                label={{
-                  value: `Change-Point (${pettitt.change_point_year})`,
-                  fill: '#F59E0B',
-                  fontSize: 10,
-                  position: 'insideTopLeft'
-                }}
-              />
-            )}
-
-            {/* 95% Confidence Interval Band */}
-            {!removeSeasonality && (
-              <>
-                <Line
-                  type="monotone"
-                  dataKey="ci_upper"
-                  name="95% CI Upper"
-                  stroke="rgba(53, 208, 127, 0.4)"
-                  strokeDasharray="3 3"
-                  strokeWidth={1}
-                  dot={false}
-                  isAnimationActive={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="ci_lower"
-                  name="95% CI Lower"
-                  stroke="rgba(53, 208, 127, 0.4)"
-                  strokeDasharray="3 3"
-                  strokeWidth={1}
-                  dot={false}
-                  isAnimationActive={false}
-                />
-              </>
-            )}
-
-            {/* Observations Line (Thin, Muted) */}
-            <Line
-              type="monotone"
-              dataKey="display_value"
-              name={removeSeasonality ? `Anomaly (${unit})` : `Observed Monthly`}
-              stroke="rgba(0, 212, 255, 0.45)"
-              strokeWidth={1.2}
-              dot={false}
-              activeDot={{ r: 4, fill: '#00D4FF', stroke: '#FFFFFF', strokeWidth: 1.5 }}
-              connectNulls={false}
-              isAnimationActive={false}
+            <Tooltip
+              content={<CustomTooltip unit={unit} isAnomalyMode={isAnomalyMode} colors={colors} />}
             />
 
-            {/* 12-Month Rolling Mean (Bold, Smooth) */}
-            {!removeSeasonality && (
-              <Line
+            {isAnomalyMode && (
+              <ReferenceLine y={0} stroke={colors.muted} strokeDasharray="2 2" strokeWidth={1} />
+            )}
+
+            {/* 95% Confidence Interval Shaded Band */}
+            {!isAnomalyMode && (
+              <Area
                 type="monotone"
-                dataKey="rolling_mean_12m"
-                name="12-Mo Rolling Mean"
-                stroke="#00D4FF"
-                strokeWidth={2.4}
-                dot={false}
-                activeDot={false}
-                connectNulls={true}
+                dataKey="ci_band"
+                name="95% CI Band"
+                stroke="none"
+                fill={colors.ciFill}
                 isAnimationActive={false}
               />
             )}
 
-            {/* Linear Trendline (Dashed Emerald) */}
-            {!removeSeasonality && (
+            {/* Pettitt Change-Point Vertical Marker */}
+            {pettitt?.change_point_date && (
+              <ReferenceLine
+                x={pettitt.change_point_date}
+                stroke={colors.changepoint}
+                strokeWidth={1.8}
+                strokeDasharray="4 4"
+                label={{
+                  value: `Shift ${pettitt.change_point_year}`,
+                  fill: colors.changepoint,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  position: 'insideTopRight'
+                }}
+              />
+            )}
+
+            {/* Monthly Observations (Thin, Muted) */}
+            <Line
+              type="monotone"
+              dataKey="display_value"
+              name={isAnomalyMode ? 'Monthly Anomaly' : 'Monthly Observations'}
+              stroke={colors.obs}
+              strokeWidth={1.15}
+              dot={false}
+              activeDot={{ r: 3.5, fill: colors.accent, stroke: colors.card, strokeWidth: 1.5 }}
+              connectNulls={false}
+              isAnimationActive={false}
+            />
+
+            {/* 12-Month Rolling Mean (Thick) */}
+            {!isAnomalyMode && (
+              <Line
+                type="monotone"
+                dataKey="rolling_mean_12m"
+                name="12-Mo Rolling Mean"
+                stroke={colors.rolling}
+                strokeWidth={2.2}
+                dot={false}
+                activeDot={false}
+                connectNulls
+                isAnimationActive={false}
+              />
+            )}
+
+            {/* Sen's Slope Dashed Line */}
+            {!isAnomalyMode && (
               <Line
                 type="linear"
                 dataKey="trend_value"
-                name="Calculated Sen\'s Trend"
-                stroke="#35D07F"
+                name="Sen's Slope Trend"
+                stroke={trendStroke}
                 strokeWidth={2.2}
-                strokeDasharray="5 5"
+                strokeDasharray="6 4"
                 dot={false}
                 activeDot={false}
-                connectNulls={true}
+                connectNulls
                 isAnimationActive={false}
               />
             )}
@@ -389,15 +354,72 @@ export default memo(function TimeSeriesChart({
         </ResponsiveContainer>
       </div>
 
-      {/* Change Point Info Callout if significant */}
-      {pettitt?.is_significant && (
-        <div className="flex items-center space-x-2 text-xs bg-amber-500/10 border border-amber-500/30 text-amber-300 p-2.5 rounded-xl">
-          <Flag className="w-4 h-4 text-amber-400 shrink-0" />
-          <span>
-            <b>Pettitt Change-Point Detected:</b> A statistically significant shift in central tendency occurred around <b>{pettitt.change_point_year}</b> (p = {pettitt.p_value}).
+      {/* Explicit Legend Row + Optional Quick Window Slider */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[var(--border)] text-[11px] text-[var(--muted)]">
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-4 h-[1.5px] inline-block" style={{ backgroundColor: colors.obs }} />
+            <span>{isAnomalyMode ? 'Monthly Anomaly' : 'Monthly Obs'}</span>
           </span>
+          {!isAnomalyMode && (
+            <>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-4 h-[2.5px] inline-block" style={{ backgroundColor: colors.rolling }} />
+                <span>12-mo Rolling Mean</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className="w-4 h-0 border-t-2 border-dashed inline-block"
+                  style={{ borderColor: trendStroke }}
+                />
+                <span>Sen&apos;s Trend</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-3.5 h-2.5 rounded-[2px] inline-block" style={{ backgroundColor: colors.ciFill }} />
+                <span>95% CI</span>
+              </span>
+            </>
+          )}
+          {pettitt?.change_point_year && (
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border font-mono text-[10px]"
+              style={{
+                borderColor: colors.changepoint,
+                color: colors.changepoint,
+                backgroundColor: 'rgba(214, 69, 93, 0.1)'
+              }}
+            >
+              <Flag className="w-2.5 h-2.5" aria-hidden="true" />
+              <span>Change-point {pettitt.change_point_year}</span>
+            </span>
+          )}
         </div>
-      )}
+
+        {maxYear - minYear > 6 && (
+          <div className="flex items-center gap-2 text-[11px] font-mono">
+            <Sliders className="w-3.5 h-3.5 text-[var(--accent)]" aria-hidden="true" />
+            <span>From {activeStartYear}</span>
+            <input
+              type="range"
+              min={minYear}
+              max={maxYear - 5}
+              value={activeStartYear}
+              aria-label="Inspect sub-window start year"
+              onChange={(e) => setYearWindowStart(parseInt(e.target.value, 10))}
+              className="w-24 accent-[var(--accent)] cursor-pointer"
+            />
+            {activeStartYear !== minYear && (
+              <button
+                type="button"
+                onClick={() => setYearWindowStart(minYear)}
+                className="text-[var(--accent)] hover:underline"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 });

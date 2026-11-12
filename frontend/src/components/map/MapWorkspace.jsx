@@ -39,10 +39,10 @@ export default memo(function MapWorkspace({
   }, [onLocationChange]);
 
   return (
-    <div className="flex flex-col h-full bg-[#13263A] rounded-2xl border border-[#1E3A56] p-4 shadow-xl">
+    <div className="flex flex-col h-full bg-[var(--card)] rounded-2xl border border-[var(--border)] p-4 shadow-xl">
       {/* Top Map Tab Navigation */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-3 pb-3 border-b border-[#1E3A56]">
-        <div className="flex items-center space-x-1.5 p-1 bg-[#0D1B2A] rounded-xl border border-[#1E3A56]">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3 pb-3 border-b border-[var(--border)]">
+        <div className="flex items-center space-x-1.5 p-1 bg-[var(--panel)] rounded-xl border border-[var(--border)]">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -53,11 +53,11 @@ export default memo(function MapWorkspace({
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   isActive
-                    ? 'bg-[#00D4FF] text-[#071426] shadow-md shadow-[#00D4FF]/20 font-bold'
-                    : 'text-slate-300 hover:text-white hover:bg-[#13263A]'
+                    ? 'bg-[var(--accent)] text-[var(--accent-fg)] shadow-md shadow-[#d9b64c]/20 font-bold'
+                    : 'text-slate-300 hover:text-white hover:bg-[var(--card)]'
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#071426]' : 'text-slate-400'}`} />
+                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[var(--accent-fg)]' : 'text-slate-400'}`} />
                 <span>{tab.label}</span>
               </button>
             );
@@ -65,12 +65,12 @@ export default memo(function MapWorkspace({
         </div>
 
         {/* Selected Coordinates Status Badge */}
-        <div className="flex items-center space-x-2 text-xs font-mono text-slate-300 bg-[#0D1B2A] px-3 py-1.5 rounded-xl border border-[#1E3A56]">
-          <Compass className="w-3.5 h-3.5 text-[#00D4FF]" />
+        <div className="flex items-center space-x-2 text-xs font-mono text-slate-300 bg-[var(--panel)] px-3 py-1.5 rounded-xl border border-[var(--border)]">
+          <Compass className="w-3.5 h-3.5 text-[var(--accent)]" />
           <span className="font-semibold text-white truncate max-w-[150px] sm:max-w-[200px]" title={selectedLocation.name}>
             {selectedLocation.name}
           </span>
-          <span className="text-[#00D4FF]">
+          <span className="text-[var(--accent)]">
             [{selectedLocation.latitude.toFixed(2)}°, {selectedLocation.longitude.toFixed(2)}°]
           </span>
         </div>

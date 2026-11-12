@@ -1,0 +1,71 @@
+/* EarthPulse AI "Terra" Design System Tokens */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f6f4ef;
+  --panel: #ffffff;
+  --card: #ffffff;
+  --card-subtle: #efece4;
+  --border: #dcd8cf;
+  --text: #17212b;
+  --muted: #5f6b78;
+  --accent: #9a6b0b;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(154, 107, 11, 0.12);
+
+  /* Semantic & Diverging Palette */
+  --warm: #d9480f;
+  --warm-soft: rgba(217, 72, 15, 0.12);
+  --cool: #1f8a84;
+  --cool-soft: rgba(31, 138, 132, 0.12);
+  --sig: #4d7a1f;
+  --sig-soft: rgba(77, 122, 31, 0.12);
+  --warn: #b45309;
+  --warn-soft: rgba(180, 83, 9, 0.12);
+  --changepoint: #d6455d;
+
+  /* Spatial / Chart Helpers */
+  --neutral-cell: #ebe8dd;
+  --sea: #e3e9e5;
+  --land-muted: #d8d4c8;
+  --grid: #e5e1d7;
+  --glass: rgba(255, 255, 255, 0.88);
+  --chart-obs: rgba(23, 33, 43, 0.35);
+  --chart-rolling: #17212b;
+  --chart-ci-fill: rgba(154, 107, 11, 0.12);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #12150f;
+  --panel: #171b13;
+  --card: #1e2318;
+  --card-subtle: #252b1e;
+  --border: #323a28;
+  --text: #f2ecdc;
+  --muted: #a7a28d;
+  --accent: #d9b64c;
+  --accent-fg: #12150f;
+  --accent-soft: rgba(217, 182, 76, 0.14);
+
+  /* Semantic & Diverging Palette */
+  --warm: #e8643a;
+  --warm-soft: rgba(232, 100, 58, 0.14);
+  --cool: #3fa7a0;
+  --cool-soft: rgba(63, 167, 160, 0.14);
+  --sig: #9cc45a;
+  --sig-soft: rgba(156, 196, 90, 0.14);
+  --warn: #e09f3e;
+  --warn-soft: rgba(224, 159, 62, 0.14);
+  --changepoint: #d6455d;
+
+  /* Spatial / Chart Helpers */
+  --neutral-cell: #30382a;
+  --sea: #0e120c;
+  --land-muted: #262d20;
+  --grid: #272d20;
+  --glass: rgba(30, 35, 24, 0.88);
+  --chart-obs: rgba(242, 236, 220, 0.32);
+  --chart-rolling: #f2ecdc;
+  --chart-ci-fill: rgba(217, 182, 76, 0.14);
+}

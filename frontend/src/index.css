@@ -1,77 +1,61 @@
+@import './theme/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: dark;
-}
-
 body {
   margin: 0;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: #071426;
-  color: #FFFFFF;
+  background-color: var(--bg);
+  color: var(--text);
   overflow-x: hidden;
 }
 
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
-  background: #071426;
+  background: var(--bg);
 }
 ::-webkit-scrollbar-thumb {
-  background: #1E3A56;
+  background: var(--border);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #00D4FF;
+  background: var(--accent);
 }
 
-/* Leaflet Container Tweaks for Dark Theme */
+/* Leaflet Container Tweaks matching Terra palette */
 .leaflet-container {
   width: 100%;
   height: 100%;
-  min-height: 420px;
-  border-radius: 0.75rem;
-  background-color: #0D1B2A !important;
+  border-radius: 14px;
+  background-color: var(--sea) !important;
   z-index: 10;
+  font-family: 'Inter', system-ui, sans-serif;
 }
 
-/* Scoped filter for OpenStreetMap fallback tiles */
-.osm-dark-tiles {
+/* Scoped filter for OpenStreetMap fallback tiles when dark mode is active */
+[data-theme="dark"] .osm-dark-tiles {
   filter: invert(1) hue-rotate(180deg) brightness(0.8) contrast(0.9) saturate(0.4);
 }
 
-
 .leaflet-popup-content-wrapper {
-  background: #13263A !important;
-  color: #FFFFFF !important;
-  border: 1px solid #1E3A56 !important;
-  border-radius: 0.5rem !important;
+  background: var(--card) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16) !important;
 }
 
 .leaflet-popup-tip {
-  background: #13263A !important;
+  background: var(--card) !important;
 }
 
-/* Pulse and Glow Utilities */
-@keyframes earthPulse {
-  0%, 100% {
-    box-shadow: 0 0 15px rgba(0, 212, 255, 0.25);
-  }
-  50% {
-    box-shadow: 0 0 30px rgba(53, 208, 127, 0.45);
-  }
-}
-
-.earth-pulse {
-  animation: earthPulse 4s infinite ease-in-out;
-}
-
-/* Accessibility: WCAG 2.1 prefers-reduced-motion standard */
+/* Accessibility: WCAG 2.1 prefers-reduced-motion */
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
@@ -83,13 +67,43 @@ body {
   }
 }
 
-/* Accessible focus styling */
+/* Accessible focus ring using semantic Terra accent */
 :focus-visible {
-  outline: 2px solid #00D4FF !important;
+  outline: 2px solid var(--accent) !important;
   outline-offset: 2px !important;
 }
 
-/* Ensure mobile tap targets meet WCAG 2.1 AAA (>=44px) */
+/* Ensure mobile tap targets meet WCAG 2.1 (>=44px) */
 .tap-target-44 {
   min-height: 44px;
+}
+
+/* Dual range slider tracks & thumbs */
+.terra-range-input {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  pointer-events: none;
+}
+
+.terra-range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: var(--accent);
+  border: 2px solid var(--panel);
+  cursor: pointer;
+}
+
+.terra-range-input::-moz-range-thumb {
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: var(--accent);
+  border: 2px solid var(--panel);
+  cursor: pointer;
 }
